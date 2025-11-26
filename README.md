@@ -1,6 +1,6 @@
-# Deep Forecasting Web App (Track 2)
+# Deep Forecasting Web App
 
-React + FastAPI implementation of the Track 2 Nixtla project: upload a CSV, pick target/date columns, run econometric/ML/neural models, benchmark them with rolling backtests, and compare results in a single UI.
+React + FastAPI implementation of the Nixtla project: upload a CSV, pick target/date columns, run econometric/ML/neural models, benchmark them with rolling backtests, and compare results in a single UI.
 
 ## Stack
 - **Frontend:** Vite + React + Tailwind (lab-style layout, benchmark/backtest controls, config persistence)
@@ -28,7 +28,7 @@ React + FastAPI implementation of the Track 2 Nixtla project: upload a CSV, pick
    ```
    Optional: set `VITE_API_BASE_URL` to point to a different backend.
 
-## Features (Track 2 coverage)
+## Features
 - **Model breadth:** StatsForecast (AutoARIMA/AutoETS/Naive/etc.), MLForecast (LightGBM/XGBoost/CatBoost/RandomForest/Linear), NeuralForecast (MLP/RNN/LSTM/GRU)
 - **Benchmarking:** `/forecast/batch` runs multiple configs at once and returns a leaderboard.
 - **Rolling backtests:** `/backtest` performs multi-window evaluations (configurable windows/step) with aggregate metrics per model.
