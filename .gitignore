@@ -18,6 +18,8 @@ coverage.xml
 .env
 .env.*
 !.env.example
+.ruff_cache/
+.mypy_cache/
 
 # Package metadata
 *.egg-info/

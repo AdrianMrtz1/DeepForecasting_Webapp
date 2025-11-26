@@ -38,8 +38,15 @@ def test_forecast_config_neuralforecast_requires_input_size() -> None:
 
 
 def test_forecast_config_rejects_unknown_model_for_statsforecast() -> None:
-    with pytest.raises(ValidationError, match="Model 'lstm' is not valid for StatsForecast"):
+    with pytest.raises(
+        ValidationError, match="Model 'lstm' is not valid for ModuleType.statsforecast"
+    ):
         ForecastConfig(**base_config(model_type="lstm"))
+
+
+def test_forecast_config_rejects_invalid_test_fraction() -> None:
+    with pytest.raises(ValueError, match="test_size_fraction must be between 0 and 1"):
+        ForecastConfig(**base_config(test_size_fraction=1.5))
 
 
 def test_forecast_request_requires_one_data_source() -> None:

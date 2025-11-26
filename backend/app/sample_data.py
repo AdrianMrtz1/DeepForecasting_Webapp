@@ -105,12 +105,12 @@ SAMPLE_DATASETS: Dict[str, SampleDataset] = {
     "airpassengers": SampleDataset(
         id="airpassengers",
         name="AirPassengers (Monthly, 1949-1960)",
-        description="Classic airline passengers series with strong trend and yearly seasonality; great for StatsForecast/TimeGPT baselines.",
+        description="Classic airline passengers series with strong trend and yearly seasonality; great for StatsForecast baselines.",
         freq="MS",
         season_length=12,
         recommended_horizon=12,
         recommended_module=ModuleType.statsforecast,
-        recommended_models=["timegpt", "auto_arima"],
+        recommended_models=["auto_arima"],
         loader=_load_airpassengers,
     ),
     "energy_daily": SampleDataset(
@@ -143,7 +143,7 @@ SAMPLE_DATASETS: Dict[str, SampleDataset] = {
         season_length=365,
         recommended_horizon=30,
         recommended_module=ModuleType.statsforecast,
-        recommended_models=["timegpt", "auto_arima"],
+        recommended_models=["auto_arima"],
         loader=_load_temperature,
     ),
 }

@@ -2,9 +2,19 @@ fastapi
 uvicorn[standard]
 pandas
 numpy
-nixtla
 statsforecast
+mlforecast
+# ray wheels are unavailable for Python 3.13, so neuralforecast must be installed manually there
+neuralforecast==3.1.2 ; python_version < "3.13"
+scikit-learn
+xgboost
+lightgbm
+catboost
+pydantic>=2
 python-multipart
 python-dotenv
 pytest
 httpx
+black
+isort
+ruff
