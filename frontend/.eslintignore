@@ -1,0 +1,7 @@
+dist
+node_modules
+coverage
+public
+vite.config.ts
+tailwind.config.js
+postcss.config.js
