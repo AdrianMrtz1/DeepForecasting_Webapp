@@ -13,7 +13,7 @@ from pathlib import Path
 import time
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile, status
+from fastapi import FastAPI, File, Form, HTTPException, Response, UploadFile, status
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import ValidationError
 
@@ -294,6 +294,22 @@ def create_app() -> FastAPI:
         saved_configs[config_id] = saved
         _persist_saved_configs(config_store_path, saved_configs)
         return saved
+
+    @app.delete(
+        "/configs/{config_id}",
+        tags=["configs"],
+        status_code=status.HTTP_204_NO_CONTENT,
+    )
+    async def delete_config(config_id: str) -> Response:
+        """Delete a saved configuration."""
+        if config_id not in saved_configs:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Config '{config_id}' was not found.",
+            )
+        saved_configs.pop(config_id, None)
+        _persist_saved_configs(config_store_path, saved_configs)
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
 
     return app
 
