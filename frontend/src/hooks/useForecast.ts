@@ -17,7 +17,7 @@ import type {
   UploadPreview,
 } from "../types";
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
+const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:9000";
 
 const defaultConfig: ForecastConfigState = {
   module_type: "StatsForecast",
@@ -504,6 +504,18 @@ export const useForecast = (initialConfig?: Partial<ForecastConfigState>) => {
     }
   }, [API_BASE]);
 
+  const deleteSavedConfig = useCallback(
+    async (id: string) => {
+      try {
+        await axios.delete(`${API_BASE}/configs/${id}`);
+        setSavedConfigs((prev) => prev.filter((cfg) => cfg.id !== id));
+      } catch (err) {
+        setError(resolveErrorMessage(err));
+      }
+    },
+    [API_BASE],
+  );
+
   const trainTest = useMemo(() => {
     if (!rows) return null;
     const test = Math.min(rows, computeHoldoutSize(rows, config));
@@ -542,5 +554,6 @@ export const useForecast = (initialConfig?: Partial<ForecastConfigState>) => {
     lastRunMs,
     trainTest,
     savedConfigs,
+    deleteSavedConfig,
   };
 };
