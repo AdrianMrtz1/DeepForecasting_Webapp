@@ -1,5 +1,10 @@
 # Deep Forecasting Web App
 
+[![Frontend](https://img.shields.io/badge/frontend-React%20%2B%20Vite-61dafb?logo=react&logoColor=20232a)](frontend/)
+[![Backend](https://img.shields.io/badge/backend-FastAPI-009485?logo=fastapi&logoColor=white)](backend/)
+[![Models](https://img.shields.io/badge/models-StatsForecast%20%7C%20MLForecast%20%7C%20NeuralForecast-9333ea)](#features)
+[![Quality](https://img.shields.io/badge/tests-pytest%20%7C%20vitest-0ea5e9)](#testing--quality)
+
 React + FastAPI implementation of the Nixtla project: upload a CSV, pick target/date columns, run econometric/ML/neural models, benchmark them with rolling backtests, and compare results in a single UI.
 
 ## Stack
@@ -37,13 +42,15 @@ React + FastAPI implementation of the Nixtla project: upload a CSV, pick target/
 - **Config persistence:** `/configs` endpoints to save/reload named configurations (stored on disk).
 - **Sample data:** `/datasets` + `/datasets/{id}` provide bundled series with recommended settings.
 
+> Fast path: drop a CSV, select `ds` + `y`, enable preset model sets, then compare leaderboard and chart views side by side.
+
 ## Key Endpoints
-- `POST /upload` — stream CSV upload, validate/remap columns, return preview + detected frequency.
-- `POST /forecast` — single-model forecast with metrics/intervals and optional fitted values.
-- `POST /forecast/batch` — run multiple configs on the same dataset; returns forecasts + leaderboard.
-- `POST /backtest` — rolling windows backtest across configs; returns per-window + aggregate metrics.
-- `GET /configs` / `POST /configs` — list/save reusable configurations.
-- `GET /datasets`, `GET /datasets/{id}` — sample metadata and full records.
+- `POST /upload`: stream CSV upload, validate/remap columns, return preview + detected frequency.
+- `POST /forecast`: single-model forecast with metrics/intervals and optional fitted values.
+- `POST /forecast/batch`: run multiple configs on the same dataset; returns forecasts + leaderboard.
+- `POST /backtest`: rolling windows backtest across configs; returns per-window + aggregate metrics.
+- `GET /configs` / `POST /configs`: list/save reusable configurations.
+- `GET /datasets`, `GET /datasets/{id}`: sample metadata and full records.
 
 ## Frontend UX Notes
 - Sidebar status + theme toggle; central ribbon for upload, sample picker, configuration (module/model/strategy/frequency/test split/log transform, missing handling, date filters).
