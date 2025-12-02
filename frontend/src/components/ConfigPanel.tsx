@@ -114,9 +114,9 @@ export const ConfigPanel = ({
 
   return (
     <div className="panel overflow-hidden">
-      <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50/80 px-5 py-4 text-slate-900 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-100">
+      <div className="flex items-center justify-between border-b border-[var(--kaito-border)] bg-[var(--kaito-subtle)] px-5 py-4 text-[var(--kaito-ink)] dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-100">
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-600/10 text-indigo-600 dark:bg-indigo-500/20 dark:text-indigo-200">
+          <div className="flex h-10 w-10 items-center justify-center rounded-[4px] border border-[var(--kaito-border)] bg-[var(--kaito-surface)] text-[var(--kaito-ink)] shadow-sm dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-100">
             <Settings2 className="h-5 w-5" />
           </div>
           <div>
@@ -127,7 +127,7 @@ export const ConfigPanel = ({
         <button
           type="button"
           onClick={() => setOpen((prev) => !prev)}
-          className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:border-indigo-200 hover:text-indigo-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-indigo-400/60"
+          className="flex items-center gap-2 rounded-[4px] border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:border-indigo-200 hover:text-indigo-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-indigo-400/60"
           aria-expanded={open}
         >
           <ChevronDown className={`h-4 w-4 transition ${open ? "rotate-180" : ""}`} />
@@ -138,7 +138,7 @@ export const ConfigPanel = ({
       {open ? (
         <div className="space-y-5 p-5">
           <div className="space-y-3">
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
+            <p className="text-xs font-semibold uppercase tracking-[0.04em] text-slate-500 dark:text-slate-400">
               Module
             </p>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
@@ -150,7 +150,7 @@ export const ConfigPanel = ({
                     key={opt.value}
                     htmlFor={inputId}
                     aria-label={opt.label}
-                    className={`flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition duration-150 ${
+                    className={`flex cursor-pointer items-start gap-3 rounded-[4px] border p-3 transition duration-150 ${
                       active
                         ? "border-indigo-300 bg-indigo-50 shadow-sm shadow-indigo-500/10 dark:border-indigo-500/50 dark:bg-indigo-500/10"
                         : "border-slate-200 bg-white hover:-translate-y-[1px] hover:border-indigo-200 hover:shadow-sm dark:border-slate-800 dark:bg-slate-900/60 dark:hover:border-indigo-400/50"
@@ -193,7 +193,7 @@ export const ConfigPanel = ({
               </label>
               <select
                 id="model-select"
-                className="mt-2 w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-slate-900 focus:border-indigo-400 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                className="mt-2 h-10 w-full rounded-[4px] border border-slate-300 bg-slate-50 px-3 text-slate-900 focus:border-indigo-400 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                 value={config.model_type}
                 onChange={(e) => onChange({ model_type: e.target.value })}
                 disabled={disabled}
@@ -221,7 +221,7 @@ export const ConfigPanel = ({
                 id="horizon-input"
                 type="number"
                 min={1}
-                className="mt-2 w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-slate-900 focus:border-indigo-400 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                className="mt-2 w-full rounded-[4px] border border-slate-300 bg-slate-50 px-3 py-2 text-slate-900 focus:border-indigo-400 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                 value={config.horizon}
                 onChange={(e) => onChange({ horizon: Number(e.target.value) })}
                 disabled={disabled}
@@ -240,7 +240,7 @@ export const ConfigPanel = ({
               </label>
               <select
                 id="freq-select"
-                className="mt-2 w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-slate-900 focus:border-indigo-400 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                className="mt-2 h-10 w-full rounded-[4px] border border-slate-300 bg-slate-50 px-3 text-slate-900 focus:border-indigo-400 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                 value={config.freq}
                 onChange={(e) => onChange({ freq: e.target.value })}
                 disabled={disabled}
@@ -273,12 +273,11 @@ export const ConfigPanel = ({
                 className="flex items-center justify-between text-sm font-semibold text-slate-800 dark:text-slate-100"
                 htmlFor="test-size-range"
               >
-                <span>Test set size (%)</span>
-                <span className="text-xs text-slate-500 dark:text-slate-400">holdout %</span>
+                <span>
+                  Test set size: <span className="font-semibold text-[#2f2a24]">{testSizePercent}%</span>
+                </span>
+                <span className="text-xs text-slate-500 dark:text-slate-400">holdout</span>
               </label>
-              <p className="mt-1 text-xs text-slate-600 dark:text-slate-300">
-                Reserve the tail of the series to validate metrics before you forecast.
-              </p>
               <div className="mt-2 flex items-center gap-3">
                 <input
                   id="test-size-range"
@@ -289,11 +288,8 @@ export const ConfigPanel = ({
                   value={testSizePercent}
                   disabled={disabled}
                   onChange={(e) => handleTestSizeChange(Number(e.target.value))}
-                  className="flex-1 accent-indigo-500"
+                  className="kaito-range flex-1"
                 />
-                <span className="w-14 text-right text-xs font-semibold text-slate-900 dark:text-slate-100">
-                  {testSizePercent}%
-                </span>
               </div>
               <div className="mt-1 flex items-center justify-between text-xs text-slate-600 dark:text-slate-300">
                 <span>
@@ -305,9 +301,9 @@ export const ConfigPanel = ({
                   type="button"
                   disabled={disabled}
                   onClick={() => handleTestSizeChange(20)}
-                  className="text-indigo-600 underline-offset-2 transition hover:text-indigo-500 dark:text-indigo-400"
+                  className="rounded-[2px] border border-[var(--kaito-border)] bg-[var(--kaito-subtle)] px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.04em] text-[var(--kaito-ink)] transition hover:shadow-[0_6px_16px_rgba(0,0,0,0.05)] disabled:opacity-60"
                 >
-                  Reset 20%
+                  Reset
                 </button>
               </div>
             </div>
@@ -319,7 +315,7 @@ export const ConfigPanel = ({
                 Missing values
               </label>
               <select
-                className="mt-2 w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-slate-900 focus:border-indigo-400 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                className="mt-2 h-10 w-full rounded-[4px] border border-slate-300 bg-slate-50 px-3 text-slate-900 focus:border-indigo-400 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                 value={config.missing_strategy ?? "none"}
                 onChange={(e) => onChange({ missing_strategy: e.target.value as any })}
                 disabled={disabled}
@@ -343,7 +339,7 @@ export const ConfigPanel = ({
                 <input
                   type="text"
                   placeholder="Start (YYYY-MM-DD)"
-                  className="w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-900 focus:border-indigo-400 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                  className="h-10 w-full rounded-[4px] border border-slate-300 bg-slate-50 px-3 text-sm text-slate-900 focus:border-indigo-400 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                   value={config.date_start ?? ""}
                   onChange={(e) => onChange({ date_start: e.target.value || null })}
                   disabled={disabled}
@@ -351,7 +347,7 @@ export const ConfigPanel = ({
                 <input
                   type="text"
                   placeholder="End (YYYY-MM-DD)"
-                  className="w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-900 focus:border-indigo-400 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                  className="h-10 w-full rounded-[4px] border border-slate-300 bg-slate-50 px-3 text-sm text-slate-900 focus:border-indigo-400 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                   value={config.date_end ?? ""}
                   onChange={(e) => onChange({ date_end: e.target.value || null })}
                   disabled={disabled}
@@ -363,7 +359,7 @@ export const ConfigPanel = ({
             </div>
           </div>
 
-          <div className="flex items-center justify-between rounded-lg bg-slate-100/80 px-4 py-3 text-xs text-slate-700 dark:bg-slate-900/60 dark:text-slate-200">
+        <div className="flex items-center justify-between rounded-[4px] bg-[var(--kaito-subtle)] px-4 py-3 text-xs text-[var(--kaito-muted)] dark:bg-slate-900/60 dark:text-slate-200">
             <div className="flex items-center gap-2">
               <SlidersHorizontal className="h-4 w-4 text-indigo-500" />
               <span>Advanced settings: strategy, seasonality, confidence, hyperparameters</span>
@@ -438,7 +434,7 @@ export const ConfigPanel = ({
                     id="season-length-input"
                     type="number"
                     min={1}
-                    className="mt-2 w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-slate-900 focus:border-indigo-400 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                    className="mt-2 w-full rounded-[4px] border border-slate-300 bg-slate-50 px-3 py-2 text-slate-900 focus:border-indigo-400 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                     value={config.season_length}
                     onChange={(e) => onChange({ season_length: Number(e.target.value) })}
                     disabled={disabled}
@@ -462,7 +458,7 @@ export const ConfigPanel = ({
                     type="button"
                     disabled={disabled}
                     onClick={() => onChange({ log_transform: !config.log_transform })}
-                    className={`mt-3 flex w-full items-center justify-between rounded-lg border px-3 py-2 text-sm font-semibold transition ${
+                    className={`mt-3 flex w-full items-center justify-between rounded-[4px] border px-3 py-2 text-sm font-semibold transition ${
                       config.log_transform
                         ? "border-indigo-300 bg-indigo-50 text-indigo-700 shadow-sm dark:border-indigo-500/60 dark:bg-indigo-500/10 dark:text-indigo-100"
                         : "border-slate-200 bg-white text-slate-700 hover:border-indigo-200 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200"
@@ -498,11 +494,10 @@ export const ConfigPanel = ({
                           type="button"
                           onClick={() => toggleLevel(lvl)}
                           disabled={disabled}
-                          className={`rounded-lg border px-3 py-1 text-xs font-semibold transition ${
-                            active
-                              ? "border-indigo-300 bg-indigo-50 text-indigo-700 shadow-sm dark:border-indigo-500/60 dark:bg-indigo-500/10 dark:text-indigo-100"
-                              : "border-slate-200 bg-white text-slate-700 hover:border-indigo-200 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200"
-                          }`}
+                          aria-pressed={active}
+                          className={`confidence-pill ${active ? "is-active shadow-sm" : ""} rounded-full border px-3 py-1 text-xs font-semibold transition focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-[#2b2b2b]/40 ${
+                            active ? "" : "hover:border-[#2b2b2b] hover:text-[#2b2b2b]"
+                          } disabled:cursor-not-allowed disabled:opacity-60`}
                         >
                           {lvl}%
                         </button>
@@ -530,7 +525,7 @@ export const ConfigPanel = ({
                     id="lag-input"
                     type="text"
                     inputMode="numeric"
-                    className="mt-2 w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-slate-900 focus:border-indigo-400 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                    className="mt-2 w-full rounded-[4px] border border-slate-300 bg-slate-50 px-3 py-2 text-slate-900 focus:border-indigo-400 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                     value={lagInputValue}
                     onChange={(e) => handleLagChange(e.target.value)}
                     placeholder="1, 12 (for lag-1 and lag-12)"
@@ -561,7 +556,7 @@ export const ConfigPanel = ({
                       </label>
                       <select
                         id="hidden-layers-select"
-                        className="mt-1 w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-slate-900 focus:border-indigo-400 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                        className="mt-1 w-full rounded-[4px] border border-slate-300 bg-slate-50 px-3 py-2 text-slate-900 focus:border-indigo-400 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                         value={config.num_layers ?? 2}
                         onChange={(e) => onChange({ num_layers: Number(e.target.value) })}
                         disabled={disabled}
@@ -584,7 +579,7 @@ export const ConfigPanel = ({
                         id="hidden-size-input"
                         type="number"
                         min={1}
-                        className="mt-1 w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-slate-900 focus:border-indigo-400 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                        className="mt-1 w-full rounded-[4px] border border-slate-300 bg-slate-50 px-3 py-2 text-slate-900 focus:border-indigo-400 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                         value={config.hidden_size ?? ""}
                         onChange={(e) =>
                           onChange({ hidden_size: normalizePositive(e.target.value) })
@@ -604,7 +599,7 @@ export const ConfigPanel = ({
                         id="epochs-input"
                         type="number"
                         min={1}
-                        className="mt-1 w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-slate-900 focus:border-indigo-400 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                        className="mt-1 w-full rounded-[4px] border border-slate-300 bg-slate-50 px-3 py-2 text-slate-900 focus:border-indigo-400 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                         value={config.epochs ?? ""}
                         onChange={(e) => onChange({ epochs: normalizePositive(e.target.value) })}
                         placeholder="e.g. 400"
@@ -621,7 +616,7 @@ export const ConfigPanel = ({
             </div>
           ) : null}
 
-          <div className="rounded-lg border border-slate-200 bg-slate-50/80 px-4 py-3 text-sm text-slate-800 shadow-sm dark:border-slate-800 dark:bg-slate-900/70 dark:text-slate-100">
+        <div className="rounded-[4px] border border-[var(--kaito-border)] bg-[var(--kaito-surface)] px-4 py-3 text-sm text-[var(--kaito-ink)] shadow-sm dark:border-slate-800 dark:bg-slate-900/70 dark:text-slate-100">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <p className="font-semibold">Run forecast</p>
@@ -635,7 +630,7 @@ export const ConfigPanel = ({
                 type="button"
                 onClick={() => (onRun ? onRun() : undefined)}
                 disabled={!canRun}
-                className="inline-flex items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm shadow-indigo-500/30 transition hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-60"
+                className="inline-flex items-center justify-center gap-2 rounded-[4px] bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm shadow-indigo-500/30 transition hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {running ? (
                   <Loader2 className="h-4 w-4 animate-spin" />

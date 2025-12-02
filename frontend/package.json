@@ -46,6 +46,8 @@
     "react": "^18.2.0",
     "react-colorful": "^5.6.1",
     "react-dom": "^18.2.0",
+    "react-markdown": "^10.1.0",
+    "react-router-dom": "^7.9.6",
     "recharts": "^3.4.1",
     "sonner": "^1.4.0"
   }

@@ -10,7 +10,6 @@ import type {
   BatchForecastResponse,
   ForecastConfigState,
   ForecastResult,
-  LeaderboardEntry,
   SavedConfig,
   SavedConfigsResponse,
   TimeSeriesRecord,
@@ -325,7 +324,7 @@ export const useForecast = (initialConfig?: Partial<ForecastConfigState>) => {
         setRows(data.rows);
         setDetectedFreq(data.detected_freq ?? null);
         if (data.detected_freq) {
-          setConfig((prev) => sanitizeConfig({ ...prev, freq: data.detected_freq }));
+          setConfig((prev) => sanitizeConfig({ ...prev, freq: data.detected_freq ?? prev.freq }));
         }
       } catch (err) {
         setError(resolveErrorMessage(err));

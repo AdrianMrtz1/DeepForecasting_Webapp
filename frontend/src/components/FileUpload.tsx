@@ -172,25 +172,25 @@ export const FileUpload = ({
               e.preventDefault();
               setDragging(true);
             }}
-            onDragLeave={() => setDragging(false)}
-            onDrop={(e) => {
-              e.preventDefault();
-              setDragging(false);
-              handleFiles(e.dataTransfer.files);
-            }}
-            className={`flex cursor-pointer flex-col items-center gap-3 rounded-xl border-2 border-dashed p-6 text-center transition ${
-              dragging
-                ? "border-indigo-400 bg-indigo-50 dark:border-indigo-400/70 dark:bg-indigo-950/30"
-                : "border-slate-300 bg-slate-50 hover:border-indigo-300 dark:border-slate-700 dark:bg-slate-900/60"
-            }`}
-          >
-            <Upload className="h-6 w-6 text-indigo-500 dark:text-indigo-400" />
-            <div>
-              <p className="font-medium text-slate-900 dark:text-slate-100">Drop a CSV here</p>
-              <p className="text-sm text-slate-600 dark:text-slate-400">
-                Map your timestamp and target columns after selecting a file.
-              </p>
-            </div>
+          onDragLeave={() => setDragging(false)}
+          onDrop={(e) => {
+            e.preventDefault();
+            setDragging(false);
+            handleFiles(e.dataTransfer.files);
+          }}
+          className={`flex cursor-pointer flex-col items-center gap-3 rounded-xl border-2 border-dashed p-6 text-center transition ${
+            dragging
+              ? "border-[var(--kaito-accent)] bg-[var(--kaito-subtle)] dark:border-indigo-400/70 dark:bg-indigo-950/30"
+              : "border-[var(--kaito-border)] bg-[var(--kaito-surface)] hover:border-[var(--kaito-accent)]/70 dark:border-slate-700 dark:bg-slate-900/60"
+          }`}
+        >
+          <Upload className="h-6 w-6 text-[var(--kaito-ink)] dark:text-indigo-400" />
+          <div>
+            <p className="font-medium text-[var(--kaito-ink)] dark:text-slate-100">Drop a CSV here</p>
+            <p className="text-sm text-[var(--kaito-muted)] dark:text-slate-400">
+              Map your timestamp and target columns after selecting a file.
+            </p>
+          </div>
             <input
               type="file"
               accept=".csv,text/csv"
@@ -198,41 +198,41 @@ export const FileUpload = ({
               className="hidden"
               aria-label="Upload CSV file"
             />
-            <span className="rounded-full bg-slate-200 px-3 py-1 text-xs font-semibold text-slate-800 dark:bg-slate-800 dark:text-slate-200">
-              {loading ? "Working..." : "Click to choose a file"}
-            </span>
-          </label>
+          <span className="rounded-full bg-[var(--kaito-subtle)] px-3 py-1 text-xs font-semibold text-[var(--kaito-ink)] dark:bg-slate-800 dark:text-slate-200">
+            {loading ? "Working..." : "Click to choose a file"}
+          </span>
+        </label>
 
-          {file && (
-            <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900/60">
-              <div className="flex items-center justify-between text-sm text-slate-700 dark:text-slate-200">
-                <span className="font-medium">Column mapping</span>
-                <span className="text-xs text-slate-500 dark:text-slate-400">{file.name}</span>
-              </div>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <label className="text-sm text-slate-700 dark:text-slate-200">
-                  <span className="mb-1 block text-xs uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">
-                    Timestamp column
-                  </span>
-                  <select
-                    className="w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-slate-900 focus:border-indigo-400 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                    value={dsCol}
-                    onChange={(e) => setDsCol(e.target.value)}
-                  >
-                    {columnOptions}
-                  </select>
-                </label>
-                <label className="text-sm text-slate-700 dark:text-slate-200">
-                  <span className="mb-1 block text-xs uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">
-                    Target column
-                  </span>
-                  <select
-                    className="w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-slate-900 focus:border-indigo-400 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                    value={yCol}
-                    onChange={(e) => setYCol(e.target.value)}
-                  >
-                    {columnOptions}
-                  </select>
+        {file && (
+          <div className="space-y-3 rounded-xl border border-[var(--kaito-border)] bg-[var(--kaito-surface)] p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
+            <div className="flex items-center justify-between text-sm text-[var(--kaito-muted)] dark:text-slate-200">
+              <span className="font-medium">Column mapping</span>
+              <span className="text-xs text-[var(--kaito-muted)] dark:text-slate-400">{file.name}</span>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="text-sm text-[var(--kaito-ink)] dark:text-slate-200">
+                <span className="mb-1 block text-xs uppercase tracking-[0.04em] text-[var(--kaito-muted)] dark:text-slate-400">
+                  Timestamp column
+                </span>
+                <select
+                  className="w-full rounded-lg border border-[var(--kaito-border)] bg-[var(--kaito-surface)] px-3 py-2 text-[var(--kaito-ink)] focus:border-[var(--kaito-accent)] focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                  value={dsCol}
+                  onChange={(e) => setDsCol(e.target.value)}
+                >
+                  {columnOptions}
+                </select>
+              </label>
+              <label className="text-sm text-[var(--kaito-ink)] dark:text-slate-200">
+                <span className="mb-1 block text-xs uppercase tracking-[0.04em] text-[var(--kaito-muted)] dark:text-slate-400">
+                  Target column
+                </span>
+                <select
+                  className="w-full rounded-lg border border-[var(--kaito-border)] bg-[var(--kaito-surface)] px-3 py-2 text-[var(--kaito-ink)] focus:border-[var(--kaito-accent)] focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                  value={yCol}
+                  onChange={(e) => setYCol(e.target.value)}
+                >
+                  {columnOptions}
+                </select>
                 </label>
               </div>
               {localError && (
@@ -249,21 +249,21 @@ export const FileUpload = ({
             </div>
           )}
 
-          <div className="flex items-center justify-between text-sm text-slate-600 dark:text-slate-400">
-            <span>Rows detected</span>
-            <span className="font-semibold text-slate-900 dark:text-slate-100">{rows || "-"}</span>
-          </div>
-
-          <div className="rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900/60">
-            <div className="flex items-center justify-between">
-              <p className="text-sm font-medium text-slate-900 dark:text-slate-100">Preview</p>
-              <span className="text-xs text-slate-500 dark:text-slate-400">first 5 rows</span>
+            <div className="flex items-center justify-between text-sm text-[var(--kaito-muted)] dark:text-slate-400">
+              <span>Rows detected</span>
+              <span className="font-semibold text-[var(--kaito-ink)] dark:text-slate-100">{rows || "-"}</span>
             </div>
-            {preview.length === 0 ? (
-              <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">
-                Upload a CSV to see a preview.
-              </p>
-            ) : (
+
+            <div className="rounded-xl border border-[var(--kaito-border)] bg-[var(--kaito-surface)] p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-medium text-[var(--kaito-ink)] dark:text-slate-100">Preview</p>
+                <span className="text-xs text-[var(--kaito-muted)] dark:text-slate-400">first 5 rows</span>
+              </div>
+              {preview.length === 0 ? (
+                <p className="mt-3 text-sm text-[var(--kaito-muted)] dark:text-slate-400">
+                  Upload a CSV to see a preview.
+                </p>
+              ) : (
               <div className="mt-3 max-h-48 overflow-auto">
                 <table className="w-full text-sm">
                   <thead className="text-left text-slate-600 dark:text-slate-400">

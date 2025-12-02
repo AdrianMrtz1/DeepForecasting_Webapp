@@ -2,37 +2,53 @@ import { useMemo, useState } from "react";
 import { flexRender, getCoreRowModel, getSortedRowModel, useReactTable } from "@tanstack/react-table";
 import type { ColumnDef, SortingState } from "@tanstack/react-table";
 
+type IntervalBounds = Record<number, { lower: number | null; upper: number | null }>;
+
 type Row = {
-  ts: string;
+  timestamp: string;
   forecast: number | null;
-  lower?: number | null;
-  upper?: number | null;
+  bounds?: IntervalBounds;
 };
 
-export function ForecastDataTable({ data }: { data: Row[] }) {
+interface Props {
+  data: Row[];
+  intervals: number[];
+}
+
+export function ForecastDataTable({ data, intervals }: Props) {
+  const intervalColumns = useMemo<ColumnDef<Row>[]>(
+    () =>
+      intervals.flatMap((level) => [
+        {
+          id: `lower-${level}`,
+          header: `Lower ${level}%`,
+          accessorFn: (row) => row.bounds?.[level]?.lower ?? null,
+          cell: ({ getValue }) => formatNumber(getValue<number | null>()),
+        },
+        {
+          id: `upper-${level}`,
+          header: `Upper ${level}%`,
+          accessorFn: (row) => row.bounds?.[level]?.upper ?? null,
+          cell: ({ getValue }) => formatNumber(getValue<number | null>()),
+        },
+      ]),
+    [intervals],
+  );
+
   const columns = useMemo<ColumnDef<Row>[]>(
     () => [
-      { accessorKey: "ts", header: "Timestamp" },
+      { accessorKey: "timestamp", header: "Timestamp" },
       {
         accessorKey: "forecast",
         header: "Forecast",
         cell: ({ getValue }) => formatNumber(getValue<number | null>()),
       },
-      {
-        accessorKey: "lower",
-        header: "Lower",
-        cell: ({ getValue }) => formatNumber(getValue<number | null>()),
-      },
-      {
-        accessorKey: "upper",
-        header: "Upper",
-        cell: ({ getValue }) => formatNumber(getValue<number | null>()),
-      },
+      ...intervalColumns,
     ],
-    [],
+    [intervalColumns],
   );
 
-  const [sorting, setSorting] = useState<SortingState>([{ id: "ts", desc: false }]);
+  const [sorting, setSorting] = useState<SortingState>([{ id: "timestamp", desc: false }]);
   const table = useReactTable({
     data,
     columns,
@@ -43,21 +59,21 @@ export function ForecastDataTable({ data }: { data: Row[] }) {
   });
 
   return (
-    <div className="border border-slate-800 rounded-xl overflow-hidden bg-slate-950">
+    <div className="overflow-hidden rounded-xl border border-[#c0b2a3] bg-[var(--kaito-surface)]">
       <div className="max-h-80 overflow-auto">
-        <table className="w-full text-sm text-slate-100">
-          <thead className="sticky top-0 bg-slate-900 shadow-sm shadow-slate-900/50">
+        <table className="w-full text-sm text-[#333]">
+          <thead className="sticky top-0 bg-[#e6e4dd] shadow-sm shadow-black/5">
             {table.getHeaderGroups().map((hg) => (
               <tr key={hg.id}>
                 {hg.headers.map((header) => (
                   <th
                     key={header.id}
-                    className="px-3 py-2 text-left font-semibold cursor-pointer select-none"
+                    className="cursor-pointer select-none px-3 py-2 text-left font-semibold"
                     onClick={header.column.getToggleSortingHandler()}
                   >
                     <div className="flex items-center gap-1">
                       {flexRender(header.column.columnDef.header, header.getContext())}
-                      <span className="text-xs text-slate-400">
+                      <span className="text-xs text-[#6a655b]">
                         {header.column.getIsSorted() === "asc"
                           ? "^"
                           : header.column.getIsSorted() === "desc"
@@ -72,9 +88,9 @@ export function ForecastDataTable({ data }: { data: Row[] }) {
           </thead>
           <tbody>
             {table.getRowModel().rows.map((row) => (
-              <tr key={row.id} className="border-t border-slate-900">
+              <tr key={row.id} className="border-t border-[#d5cbbf]">
                 {row.getVisibleCells().map((cell) => (
-                  <td key={cell.id} className="px-3 py-2 text-slate-200">
+                  <td key={cell.id} className="px-3 py-2">
                     {flexRender(cell.column.columnDef.cell, cell.getContext())}
                   </td>
                 ))}

@@ -10,7 +10,6 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import type { NameType, TooltipProps, ValueType } from "recharts";
 
 import type { ForecastMetrics, ForecastResult, TimeSeriesRecord } from "../types";
 
@@ -77,8 +76,8 @@ const sortKeys = (keys: string[]) =>
 
 type ForecastTooltipProps = {
   active?: boolean;
-  payload?: TooltipProps<ValueType, NameType>["payload"];
-  label?: TooltipProps<ValueType, NameType>["label"];
+  payload?: ReadonlyArray<{ payload?: ChartPoint }>;
+  label?: string | number;
   intervalLevels: number[];
 };
 
@@ -88,24 +87,24 @@ const ForecastTooltip = ({ active, payload, label, intervalLevels }: ForecastToo
   if (!point) return null;
 
   return (
-    <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-md shadow-slate-200/40 dark:border-slate-800 dark:bg-slate-900/90">
-      <p className="text-xs text-slate-600 dark:text-slate-400">{formatLabel(label)}</p>
-      <div className="mt-1 space-y-1 text-sm text-slate-900 dark:text-slate-100">
+    <div className="rounded-lg border border-[#c0b2a3] bg-[var(--kaito-surface)] px-3 py-2 shadow-md shadow-black/10 dark:border-slate-800 dark:bg-slate-900/90">
+      <p className="text-xs text-[#6a655b] dark:text-slate-400">{formatLabel(label)}</p>
+      <div className="mt-1 space-y-1 text-sm text-[#2f2a24] dark:text-slate-100">
         {point.actual !== undefined && (
-          <div className="text-blue-700 dark:text-blue-300">Actual: {point.actual.toFixed(3)}</div>
+          <div className="text-[#222] dark:text-blue-300">Actual: {point.actual.toFixed(3)}</div>
         )}
         {point.testActual !== undefined && (
-          <div className="text-amber-700 dark:text-amber-300">
+          <div className="text-[#4a473f] dark:text-amber-300">
             Test actual: {point.testActual.toFixed(3)}
           </div>
         )}
         {point.trainPrediction !== undefined && (
-          <div className="text-indigo-700 dark:text-indigo-300">
+          <div className="text-[#6f6458] dark:text-indigo-300">
             Train fit: {point.trainPrediction.toFixed(3)}
           </div>
         )}
         {point.forecast !== undefined && (
-          <div className="text-emerald-700 dark:text-emerald-300">
+          <div className="text-[#c25b00] dark:text-emerald-300">
             Forecast: {point.forecast.toFixed(3)}
           </div>
         )}
@@ -137,8 +136,8 @@ export const ForecastChart = ({
   history = [],
   forecast,
   testSet = [],
-  accentColor,
-  secondaryColor,
+  accentColor: _accentColor,
+  secondaryColor: _secondaryColor,
   warmColor,
   metrics,
   modelLabel,
@@ -249,25 +248,21 @@ export const ForecastChart = ({
 
   const isDimmed = (key: SeriesKey) => focusedSeries !== null && focusedSeries !== key;
   const colorSet = useMemo(() => {
-    const forecastStroke = accentColor ?? "#22d3ee";
-    const trainStroke = secondaryColor ?? "#7dd3fc";
-    const testStroke = warmColor ?? "#fbbf24";
-    const fitStroke = "#a5b4fc";
-    const bands = [
-      hexToRgba(forecastStroke, 0.22),
-      hexToRgba(trainStroke, 0.18),
-      hexToRgba(testStroke, 0.18),
-    ];
+    const forecastStroke = "#c25b00";
+    const trainStroke = "#222";
+    const testStroke = warmColor ?? "#524b41";
+    const fitStroke = "#8c7968";
+    const bandFill = hexToRgba("#c25b00", 0.1);
     return {
       forecast: forecastStroke,
       train: trainStroke,
       test: testStroke,
       fit: fitStroke,
-      bandFills: bands,
+      bandFills: [bandFill],
     };
-  }, [accentColor, secondaryColor, warmColor]);
+  }, [warmColor]);
 
-  const strokeFor = (key: SeriesKey, color: string) => (isDimmed(key) ? "#475569" : color);
+  const strokeFor = (key: SeriesKey, color: string) => (isDimmed(key) ? "#7d7368" : color);
   const opacityFor = (key: SeriesKey) => (isDimmed(key) ? 0.35 : 1);
   const hasData = data.length > 0;
   const tickerItems = [
@@ -279,7 +274,7 @@ export const ForecastChart = ({
   const showSkeleton = loading;
 
   return (
-    <div className="panel relative h-[440px] p-4" aria-busy={loading}>
+    <div className="timeline-card panel relative box-border h-[440px] overflow-hidden p-6" aria-busy={loading}>
       {loading ? (
         <div className="scanline absolute inset-x-0 top-0 h-1 overflow-hidden rounded-t-xl bg-slate-200 dark:bg-slate-800/80">
           <div className="scanline-bar h-full w-1/3" />
@@ -314,14 +309,14 @@ export const ForecastChart = ({
         </div>
       </div>
 
-      <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">
+      <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.04em] text-[#4a473f] dark:text-slate-300">
         {tickerItems.map((item) => (
           <div
             key={item.label}
-            className="flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 shadow-sm shadow-slate-200/40 dark:border-slate-800 dark:bg-slate-900/70 dark:shadow-none"
+            className="flex items-center gap-2 rounded-full border border-[#c0b2a3] bg-[var(--kaito-surface)] px-3 py-1 shadow-sm shadow-black/5 dark:border-slate-800 dark:bg-slate-900/70 dark:shadow-none"
           >
-            <span className="text-[10px] text-slate-500 dark:text-slate-400">{item.label}</span>
-            <span className="font-mono text-xs text-slate-900 dark:text-slate-100">
+            <span className="text-[10px] text-[#6a655b] dark:text-slate-400">{item.label}</span>
+            <span className="font-mono text-xs text-[#2f2a24] dark:text-slate-100">
               {item.value}
             </span>
           </div>
@@ -333,7 +328,6 @@ export const ForecastChart = ({
           { key: "train" as SeriesKey, label: "Train actuals", disabled: data.length === 0 },
           { key: "test" as SeriesKey, label: "Test actuals", disabled: testSet.length === 0 },
           { key: "forecast" as SeriesKey, label: "Forecast", disabled: !forecast },
-          { key: "fit" as SeriesKey, label: "Train fit", disabled: !forecast?.fitted },
         ].map(({ key, label, disabled }) => {
           const active = focusedSeries === key;
           return (
@@ -344,8 +338,8 @@ export const ForecastChart = ({
               onClick={() => setFocusedSeries((prev) => (prev === key ? null : key))}
               className={`rounded-full border px-3 py-1 font-semibold transition ${
                 active
-                  ? "border-indigo-300 bg-indigo-50 text-indigo-700 shadow-sm dark:border-indigo-500/70 dark:bg-indigo-500/10 dark:text-indigo-100"
-                  : "border-slate-200 bg-white text-slate-700 hover:border-indigo-200 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200"
+                  ? "border-[#c25b00] bg-[#f2e8de] text-[#c25b00] shadow-sm dark:border-indigo-500/70 dark:bg-indigo-500/10 dark:text-indigo-100"
+                  : "border-[#c0b2a3] bg-[var(--kaito-surface)] text-[#4a473f] hover:border-[#c25b00] dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200"
               } disabled:cursor-not-allowed disabled:opacity-50`}
             >
               {active ? `Focus: ${label}` : `Toggle ${label}`}
@@ -395,7 +389,7 @@ export const ForecastChart = ({
           ))}
       </div>
 
-      <div className="mt-4 h-[300px] relative">
+      <div className="timeline-chart relative mt-4 box-border h-[300px] w-full pr-6">
         {showSkeleton ? (
           <div className="chart-skeleton pointer-events-none absolute inset-0 z-10 rounded-xl">
             <div className="absolute inset-3 flex flex-col justify-between gap-4">
@@ -414,22 +408,22 @@ export const ForecastChart = ({
         ) : null}
         {hasData ? (
           <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+            <LineChart data={data} margin={{ top: 10, right: 24, left: 0, bottom: 0 }}>
               <defs>
                 <linearGradient id="forecastGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#22d3ee" stopOpacity={0.38} />
-                  <stop offset="50%" stopColor="#22d3ee" stopOpacity={0.14} />
-                  <stop offset="100%" stopColor="#22d3ee" stopOpacity={0} />
+                  <stop offset="0%" stopColor="#c25b00" stopOpacity={0.28} />
+                  <stop offset="50%" stopColor="#c25b00" stopOpacity={0.12} />
+                  <stop offset="100%" stopColor="#c25b00" stopOpacity={0} />
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="4 4" stroke="#94a3b8" strokeOpacity={0.35} />
+              <CartesianGrid strokeDasharray="4 4" stroke="#b0a899" strokeOpacity={0.45} />
               <XAxis
                 dataKey="ds"
                 tickFormatter={formatLabel}
-                tick={{ fill: "#475569", fontSize: 11 }}
+                tick={{ fill: "#5c564d", fontSize: 11 }}
                 height={40}
               />
-              <YAxis tick={{ fill: "#475569", fontSize: 11 }} />
+              <YAxis tick={{ fill: "#5c564d", fontSize: 11 }} />
               <Tooltip
                 labelFormatter={formatLabel}
                 content={(props) => <ForecastTooltip intervalLevels={intervalLevels} {...props} />}

@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import axios from "axios";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -7,12 +8,15 @@ import App from "./App";
 vi.mock("axios");
 const mockedPost = vi.mocked(axios.post);
 const mockedGet = vi.mocked(axios.get);
+const queryClient = new QueryClient();
 
 describe("Deep Forecasting frontend", () => {
   beforeEach(() => {
     mockedPost.mockReset();
     mockedGet.mockReset();
     mockedGet.mockResolvedValue({ data: { datasets: [] } });
+    window.history.pushState({}, "", "/forecast");
+    queryClient.clear();
   });
 
   it("uploads a CSV and runs a forecast", async () => {
@@ -59,12 +63,16 @@ describe("Deep Forecasting frontend", () => {
       return Promise.reject(new Error("Unknown URL"));
     });
 
-    render(<App />);
+    render(
+      <QueryClientProvider client={queryClient}>
+        <App />
+      </QueryClientProvider>,
+    );
 
     const file = new File(["ds,y\n2024-01-01,1\n2024-01-02,2"], "data.csv", {
       type: "text/csv",
     });
-    const input = screen.getByLabelText(/upload csv file/i);
+    const input = await screen.findByLabelText(/upload csv file/i);
 
     await waitFor(() => fireEvent.change(input, { target: { files: [file] } }));
 

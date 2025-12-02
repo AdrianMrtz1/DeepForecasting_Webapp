@@ -21,7 +21,7 @@ const formatLabel = (dataset: DatasetInfo) => {
 };
 
 const badge = (label: string) => (
-  <span className="rounded-full border border-slate-200 bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">
+  <span className="rounded-full border border-[var(--kaito-border)] bg-[var(--kaito-subtle)] px-2.5 py-1 text-[11px] font-semibold text-[var(--kaito-muted)] dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">
     {label}
   </span>
 );
@@ -50,7 +50,7 @@ export const SampleDatasetPicker = ({
         <button
           type="button"
           onClick={() => setOpen((prev) => !prev)}
-          className="pill border-slate-300 bg-slate-100 text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+          className="pill border-[var(--kaito-border)] bg-[var(--kaito-surface)] text-[var(--kaito-muted)] dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
           aria-expanded={open}
         >
           <ChevronDown className={`h-4 w-4 transition ${open ? "rotate-180" : ""}`} />
@@ -59,19 +59,19 @@ export const SampleDatasetPicker = ({
       </div>
 
       {open ? (
-        <p className="text-sm text-slate-600 dark:text-slate-400">
+        <p className="text-sm text-[var(--kaito-muted)] dark:text-slate-400">
           Skip uploading by pulling a curated dataset with recommended settings. You can still
           upload your own CSV below.
         </p>
       ) : (
-        <p className="text-xs text-slate-500 dark:text-slate-400">Collapsed for a cleaner view.</p>
+        <p className="text-xs text-[var(--kaito-muted)] dark:text-slate-400">Collapsed for a cleaner view.</p>
       )}
 
       {error && <p className="text-xs text-amber-600 dark:text-amber-300">{error}</p>}
 
       {open ? (
         datasets.length === 0 ? (
-          <div className="flex items-center gap-3 rounded-lg border border-dashed border-slate-300 bg-slate-100 p-3 text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-300">
+          <div className="flex items-center gap-3 rounded-lg border border-dashed border-[var(--kaito-border)] bg-[var(--kaito-subtle)] p-3 text-sm text-[var(--kaito-muted)] dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-300">
             <Database className="h-4 w-4 text-slate-400" />
             <span>No bundled datasets were returned by the API.</span>
           </div>
@@ -83,7 +83,7 @@ export const SampleDatasetPicker = ({
               return (
                 <div
                   key={dataset.id}
-                  className={`panel-subtle border p-3 transition ${
+                   className={`panel-subtle border p-3 transition ${
                     isActive
                       ? "border-emerald-400/60 shadow-md shadow-emerald-500/10"
                       : "hover:border-indigo-300/70"
@@ -91,10 +91,10 @@ export const SampleDatasetPicker = ({
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="space-y-1">
-                      <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                       <p className="text-sm font-semibold text-[var(--kaito-ink)] dark:text-slate-100">
                         {dataset.name}
                       </p>
-                      <p className="text-xs text-slate-600 dark:text-slate-400">
+                       <p className="text-xs text-[var(--kaito-muted)] dark:text-slate-400">
                         {dataset.description}
                       </p>
                       <div className="mt-2 flex flex-wrap gap-2">
@@ -110,20 +110,20 @@ export const SampleDatasetPicker = ({
                       type="button"
                       onClick={() => onSelect(dataset.id)}
                       disabled={isLoading}
-                      className={`inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
-                        isActive
-                          ? "bg-emerald-500 text-white shadow-sm shadow-emerald-500/40"
-                          : "border border-slate-300 bg-white text-slate-800 hover:border-indigo-200 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:border-indigo-400/60"
-                      } disabled:cursor-not-allowed disabled:opacity-60`}
+                       className={`inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+                         isActive
+                           ? "bg-emerald-500 text-white shadow-sm shadow-emerald-500/40"
+                           : "border border-[var(--kaito-border)] bg-[var(--kaito-surface)] text-[var(--kaito-ink)] hover:border-[var(--kaito-accent)]/60 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:border-indigo-400/60"
+                       } disabled:cursor-not-allowed disabled:opacity-60`}
                     >
                       {isLoading && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
                       {isActive ? "Loaded" : "Use sample"}
                     </button>
                   </div>
                   {dataset.sample?.length ? (
-                    <div className="mt-3 overflow-hidden rounded-lg border border-slate-200 dark:border-slate-800">
-                      <table className="w-full text-xs">
-                        <thead className="bg-slate-100 text-left text-slate-600 dark:bg-slate-900 dark:text-slate-400">
+                     <div className="mt-3 overflow-hidden rounded-lg border border-[var(--kaito-border)] dark:border-slate-800">
+                       <table className="w-full text-xs">
+                         <thead className="bg-[var(--kaito-subtle)] text-left text-[var(--kaito-muted)] dark:bg-slate-900 dark:text-slate-400">
                           <tr>
                             <th className="px-3 py-1 font-medium">ds</th>
                             <th className="px-3 py-1 text-right font-medium">y</th>
