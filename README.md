@@ -62,5 +62,5 @@ React + FastAPI implementation of the Nixtla project: upload a CSV, pick target/
 - Frontend: `npm run test` (Vitest), `npm run lint` (ESLint + Prettier).
 
 ## Deployment Tips
-- Backend: run `uvicorn app.main:app --host 0.0.0.0 --port 8000`.
+- Backend: run `uvicorn app.main:app --host 0.0.0.0 --port 9000`.
 - Frontend: `npm run build` outputs to `frontend/dist/`; serve via any static host and set `VITE_API_BASE_URL` accordingly.
