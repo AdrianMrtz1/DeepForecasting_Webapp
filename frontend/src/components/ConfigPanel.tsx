@@ -113,7 +113,7 @@ export const ConfigPanel = ({
   const canRun = Boolean(onRun) && dataReady && !disabled && !running;
 
   return (
-    <div className="panel overflow-hidden">
+    <div className="panel sticky top-0 h-screen w-full overflow-y-auto overflow-x-hidden overscroll-contain scrollbar-thin scrollbar-thumb-slate-200 scrollbar-track-transparent">
       <div className="flex items-center justify-between border-b border-[var(--kaito-border)] bg-[var(--kaito-subtle)] px-5 py-4 text-[var(--kaito-ink)] dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-100">
         <div className="flex items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-[4px] border border-[var(--kaito-border)] bg-[var(--kaito-surface)] text-[var(--kaito-ink)] shadow-sm dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-100">
@@ -141,7 +141,7 @@ export const ConfigPanel = ({
             <p className="text-xs font-semibold uppercase tracking-[0.04em] text-slate-500 dark:text-slate-400">
               Module
             </p>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            <div className="grid grid-cols-1 gap-3">
               {moduleOptions.map((opt) => {
                 const active = config.module_type === opt.value;
                 const inputId = `module-${opt.value}`;
@@ -150,7 +150,7 @@ export const ConfigPanel = ({
                     key={opt.value}
                     htmlFor={inputId}
                     aria-label={opt.label}
-                    className={`flex cursor-pointer items-start gap-3 rounded-[4px] border p-3 transition duration-150 ${
+                    className={`flex cursor-pointer items-start gap-3 rounded-[4px] border p-2 transition duration-150 ${
                       active
                         ? "border-indigo-300 bg-indigo-50 shadow-sm shadow-indigo-500/10 dark:border-indigo-500/50 dark:bg-indigo-500/10"
                         : "border-slate-200 bg-white hover:-translate-y-[1px] hover:border-indigo-200 hover:shadow-sm dark:border-slate-800 dark:bg-slate-900/60 dark:hover:border-indigo-400/50"
@@ -166,11 +166,11 @@ export const ConfigPanel = ({
                       onChange={() => onChange({ module_type: opt.value })}
                       className="mt-1 accent-indigo-500"
                     />
-                    <div className="min-w-0 space-y-1">
-                      <p className="truncate text-sm font-semibold leading-tight text-slate-900 dark:text-slate-100">
+                    <div className="w-full space-y-1">
+                      <p className="truncate whitespace-nowrap text-sm font-semibold leading-tight text-slate-900 dark:text-slate-100">
                         {opt.label}
                       </p>
-                      <p className="break-words text-xs leading-snug text-slate-600 dark:text-slate-300">
+                      <p className="text-[10px] leading-snug text-slate-600 dark:text-slate-300">
                         {opt.helper}
                       </p>
                     </div>
@@ -180,7 +180,7 @@ export const ConfigPanel = ({
             </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+          <div className="grid grid-cols-1 gap-3">
             <div className="panel-subtle p-3">
               <label
                 className="flex items-center justify-between text-sm text-slate-800 dark:text-slate-100"
@@ -309,7 +309,7 @@ export const ConfigPanel = ({
             </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+          <div className="grid grid-cols-1 gap-3">
             <div className="panel-subtle p-3">
               <label className="text-sm font-semibold text-slate-800 dark:text-slate-100">
                 Missing values
@@ -422,7 +422,7 @@ export const ConfigPanel = ({
                 </p>
               </div>
 
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+              <div className="grid grid-cols-1 gap-3">
                 <div className="panel-subtle p-3">
                   <label
                     className="text-sm font-semibold text-slate-800 dark:text-slate-100"
@@ -546,7 +546,7 @@ export const ConfigPanel = ({
                       applies to MLP/RNN/LSTM/GRU
                     </span>
                   </div>
-                  <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
+                  <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <div>
                       <label
                         className="text-xs font-semibold text-slate-700 dark:text-slate-200"

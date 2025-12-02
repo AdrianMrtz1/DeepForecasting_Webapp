@@ -297,6 +297,15 @@
   border-color: var(--kaito-border);
 }
 
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
 .dark .kaito-shell .bg-slate-50,
 .dark .kaito-shell .bg-slate-100 {
   background-color: #0b1220;

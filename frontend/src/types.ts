@@ -62,6 +62,12 @@ export interface ForecastResult {
   fitted?: ForecastSeries | null;
 }
 
+export interface ForecastRun extends ForecastResult {
+  runId: string;
+  createdAt: number;
+  durationMs?: number | null;
+}
+
 export interface LeaderboardEntry {
   model_label: string;
   module_type: ModuleType;

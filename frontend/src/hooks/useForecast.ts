@@ -10,6 +10,7 @@ import type {
   BatchForecastResponse,
   ForecastConfigState,
   ForecastResult,
+  ForecastRun,
   SavedConfig,
   SavedConfigsResponse,
   TimeSeriesRecord,
@@ -158,6 +159,17 @@ const parseCsvRecords = (
   return parsed;
 };
 
+const createRunId = () => {
+  try {
+    if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+      return crypto.randomUUID();
+    }
+  } catch {
+    /* ignore */
+  }
+  return `run-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+};
+
 const normalizeDetail = (detail: unknown): string => {
   if (Array.isArray(detail)) {
     const messages = detail
@@ -238,13 +250,17 @@ export const useForecast = (initialConfig?: Partial<ForecastConfigState>) => {
   const [selectedDataset, setSelectedDataset] = useState<DatasetInfo | null>(null);
   const [dataSource, setDataSource] = useState<DataSource>(null);
   const [sampleLoading, setSampleLoading] = useState<string | null>(null);
-  const [forecast, setForecast] = useState<ForecastResult | null>(null);
+  const [forecastHistory, setForecastHistory] = useState<ForecastRun[]>([]);
   const [batchResult, setBatchResult] = useState<BatchForecastResponse | null>(null);
   const [backtestResult, setBacktestResult] = useState<BacktestResponse | null>(null);
   const [savedConfigs, setSavedConfigs] = useState<SavedConfig[]>([]);
   const [loading, setLoading] = useState<LoadingState>("idle");
   const [error, setError] = useState<string | null>(null);
   const [lastRunMs, setLastRunMs] = useState<number | null>(null);
+  const latestForecast = useMemo(
+    () => forecastHistory[forecastHistory.length - 1] ?? null,
+    [forecastHistory],
+  );
 
   useEffect(() => {
     safeWrite("forecastConfig", config);
@@ -300,7 +316,9 @@ export const useForecast = (initialConfig?: Partial<ForecastConfigState>) => {
     async (file: File, mapping: ColumnMapping = { ds: "ds", y: "y" }) => {
       setLoading("upload");
       setError(null);
-      setForecast(null);
+      setForecastHistory([]);
+      setBatchResult(null);
+      setBacktestResult(null);
       setLastRunMs(null);
       setSelectedDataset(null);
       setDataSource("upload");
@@ -343,7 +361,9 @@ export const useForecast = (initialConfig?: Partial<ForecastConfigState>) => {
     setLoading("upload");
     setSampleLoading(datasetId);
     setError(null);
-    setForecast(null);
+    setForecastHistory([]);
+    setBatchResult(null);
+    setBacktestResult(null);
     setLastRunMs(null);
     setUploadId(null);
     try {
@@ -391,9 +411,13 @@ export const useForecast = (initialConfig?: Partial<ForecastConfigState>) => {
         }
 
         const { data } = await axios.post<ForecastResult>(`${API_BASE}/forecast`, payload);
-        setForecast(data);
         const finishedAt = typeof performance !== "undefined" ? performance.now() : Date.now();
-        setLastRunMs(Math.max(0, Math.round(finishedAt - startedAt)));
+        const duration = Math.max(0, Math.round(finishedAt - startedAt));
+        const createdAt = Date.now();
+        const runId = createRunId();
+        const run: ForecastRun = { ...data, runId, createdAt, durationMs: duration };
+        setForecastHistory((prev) => [...prev, run]);
+        setLastRunMs(duration);
       } catch (err) {
         setError(resolveErrorMessage(err));
         setLastRunMs(null);
@@ -545,7 +569,8 @@ export const useForecast = (initialConfig?: Partial<ForecastConfigState>) => {
     selectedDataset,
     dataSource,
     history: history.length ? history : preview,
-    forecast,
+    forecast: latestForecast,
+    forecastHistory,
     batchResult,
     backtestResult,
     loading,

@@ -11,11 +11,11 @@ import {
   YAxis,
 } from "recharts";
 
-import type { ForecastMetrics, ForecastResult, TimeSeriesRecord } from "../types";
+import type { ForecastMetrics, ForecastRun, TimeSeriesRecord } from "../types";
 
 interface ForecastChartProps {
   history?: TimeSeriesRecord[];
-  forecast?: ForecastResult | null;
+  forecasts?: ForecastRun[];
   testSet?: TimeSeriesRecord[];
   accentColor?: string;
   secondaryColor?: string;
@@ -32,12 +32,8 @@ type ChartPoint = {
   ds: string;
   actual?: number;
   testActual?: number;
-  forecast?: number;
   trainPrediction?: number;
-} & Record<`lower_${number}` | `upper_${number}`, number | undefined> &
-  Record<`range_${number}`, [number, number] | undefined>;
-
-type SeriesKey = "train" | "test" | "forecast" | "fit";
+} & Record<string, number | [number, number] | string | undefined>;
 
 const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
 
@@ -74,6 +70,17 @@ const sortKeys = (keys: string[]) =>
     return da - db;
   });
 
+const FORECAST_COLORS = [
+  "#c25b00",
+  "#2563eb",
+  "#16a34a",
+  "#d946ef",
+  "#0891b2",
+  "#f97316",
+  "#a855f7",
+  "#f43f5e",
+];
+
 type ForecastTooltipProps = {
   active?: boolean;
   payload?: ReadonlyArray<{ payload?: ChartPoint }>;
@@ -81,10 +88,30 @@ type ForecastTooltipProps = {
   intervalLevels: number[];
 };
 
-const ForecastTooltip = ({ active, payload, label, intervalLevels }: ForecastTooltipProps) => {
+type ForecastLine = {
+  run: ForecastRun;
+  dataKey: string;
+  color: string;
+  label: string;
+};
+
+const ForecastTooltip = ({
+  active,
+  payload,
+  label,
+  intervalLevels,
+  forecastSeries,
+}: ForecastTooltipProps & { forecastSeries: ForecastLine[] }) => {
   if (!active || !payload?.length) return null;
   const point: ChartPoint | undefined = payload[0]?.payload;
   if (!point) return null;
+  const forecastRows = forecastSeries
+    .map((series) => {
+      const value = point?.[series.dataKey] as number | undefined;
+      if (value === undefined) return null;
+      return { ...series, value };
+    })
+    .filter(Boolean) as Array<ForecastLine & { value: number }>;
 
   return (
     <div className="rounded-lg border border-[#c0b2a3] bg-[var(--kaito-surface)] px-3 py-2 shadow-md shadow-black/10 dark:border-slate-800 dark:bg-slate-900/90">
@@ -103,15 +130,28 @@ const ForecastTooltip = ({ active, payload, label, intervalLevels }: ForecastToo
             Train fit: {point.trainPrediction.toFixed(3)}
           </div>
         )}
-        {point.forecast !== undefined && (
-          <div className="text-[#c25b00] dark:text-emerald-300">
-            Forecast: {point.forecast.toFixed(3)}
+        {forecastRows.map((series) => (
+          <div
+            key={series.dataKey}
+            className="flex items-center justify-between gap-2 text-[#c25b00] dark:text-emerald-300"
+          >
+            <span className="flex items-center gap-2">
+              <span
+                className="h-2.5 w-2.5 rounded-full"
+                style={{ backgroundColor: series.color }}
+                aria-hidden
+              />
+              <span className="text-[#2f2a24] dark:text-slate-100">{series.label}</span>
+            </span>
+            <span className="font-mono text-[#2f2a24] dark:text-slate-100">
+              {series.value.toFixed(3)}
+            </span>
           </div>
-        )}
+        ))}
         {intervalLevels.map((lvl) => {
-          const lower = point[`lower_${lvl}`];
-          const upper = point[`upper_${lvl}`];
-          if (lower === undefined || upper === undefined) return null;
+          const lower = point[`lower_${lvl}`] as number | undefined;
+          const upper = point[`upper_${lvl}`] as number | undefined;
+          if (typeof lower !== "number" || typeof upper !== "number") return null;
           return (
             <div
               key={`tooltip-${lvl}`}
@@ -134,7 +174,7 @@ const formatMetric = (value?: number | null) =>
 
 export const ForecastChart = ({
   history = [],
-  forecast,
+  forecasts = [],
   testSet = [],
   accentColor: _accentColor,
   secondaryColor: _secondaryColor,
@@ -146,18 +186,34 @@ export const ForecastChart = ({
   onQuickStart,
   quickLabel,
 }: ForecastChartProps) => {
-  const [focusedSeries, setFocusedSeries] = useState<SeriesKey | null>(null);
+  const [focusedSeries, setFocusedSeries] = useState<string | null>(null);
+  const forecastSeries = useMemo<ForecastLine[]>(() => {
+    const palette = FORECAST_COLORS;
+    return (forecasts ?? []).map((run, idx) => {
+      const safeId = (run.runId || `run-${idx}`).replace(/[^a-zA-Z0-9_]/g, "_");
+      return {
+        run,
+        dataKey: `forecast_${safeId}`,
+        color: palette[idx % palette.length],
+        label: `${run.config.model_type.toUpperCase()} (${run.config.module_type})`,
+      };
+    });
+  }, [forecasts]);
+  const primarySeries = forecastSeries[forecastSeries.length - 1] ?? null;
+  const primaryForecast = primarySeries?.run ?? null;
+  const primaryDataKey = primarySeries?.dataKey ?? "forecast_primary";
+  const primaryStroke = primarySeries?.color ?? _accentColor ?? "#c25b00";
   const intervalLevels = useMemo(
-    () => forecast?.bounds?.map((b) => b.level)?.sort((a, b) => a - b) ?? [],
-    [forecast],
+    () => primaryForecast?.bounds?.map((b) => b.level)?.sort((a, b) => a - b) ?? [],
+    [primaryForecast],
   );
   const boundsMap = useMemo(() => {
     const map = new Map<number, { lower: number[]; upper: number[] }>();
-    forecast?.bounds?.forEach((interval) =>
+    primaryForecast?.bounds?.forEach((interval) =>
       map.set(interval.level, { lower: interval.lower, upper: interval.upper }),
     );
     return map;
-  }, [forecast]);
+  }, [primaryForecast]);
   const bandOpacityByLevel = useMemo(() => {
     if (!intervalLevels.length) return new Map<number, number>();
     const spreads = intervalLevels.map((lvl) => {
@@ -176,17 +232,17 @@ export const ForecastChart = ({
     });
     return mapped;
   }, [boundsMap, intervalLevels]);
-  const moduleBadge = forecast
-    ? `${forecast.config.module_type} / ${forecast.config.model_type.toUpperCase()}`
+  const moduleBadge = primaryForecast
+    ? `${primaryForecast.config.module_type} / ${primaryForecast.config.model_type.toUpperCase()}`
     : "Awaiting run";
   const testSplitBadge =
-    forecast?.config.test_size_fraction && forecast.config.test_size_fraction > 0
-      ? `${Math.round(forecast.config.test_size_fraction * 100)}% test split`
+    primaryForecast?.config.test_size_fraction && primaryForecast.config.test_size_fraction > 0
+      ? `${Math.round(primaryForecast.config.test_size_fraction * 100)}% test split`
       : "No test split";
 
   const fittedMap = useMemo(() => {
     const map = new Map<string, number>();
-    const fitted = forecast?.fitted;
+    const fitted = primaryForecast?.fitted;
     if (!fitted) return map;
     fitted.timestamps.forEach((ts, idx) => {
       const value = fitted.forecast[idx];
@@ -195,7 +251,7 @@ export const ForecastChart = ({
       }
     });
     return map;
-  }, [forecast?.fitted]);
+  }, [primaryForecast?.fitted]);
 
   const data = useMemo<ChartPoint[]>(() => {
     const points = new Map<string, ChartPoint>();
@@ -227,10 +283,16 @@ export const ForecastChart = ({
       point.trainPrediction = value;
     });
 
-    if (forecast) {
-      forecast.timestamps.forEach((ts, idx) => {
+    forecastSeries.forEach((series) => {
+      series.run.timestamps.forEach((ts, idx) => {
         const point = ensurePoint(ts);
-        point.forecast = forecast.forecast[idx];
+        point[series.dataKey] = series.run.forecast[idx];
+      });
+    });
+
+    if (primaryForecast) {
+      primaryForecast.timestamps.forEach((ts, idx) => {
+        const point = ensurePoint(ts);
         intervalLevels.forEach((lvl) => {
           const bounds = boundsMap.get(lvl);
           if (bounds) {
@@ -244,26 +306,24 @@ export const ForecastChart = ({
 
     const ordered = sortKeys(Array.from(points.keys()));
     return ordered.map((key) => points.get(key)!);
-  }, [boundsMap, forecast, fittedMap, history, intervalLevels, testSet]);
+  }, [boundsMap, forecastSeries, fittedMap, history, intervalLevels, primaryForecast, testSet]);
 
-  const isDimmed = (key: SeriesKey) => focusedSeries !== null && focusedSeries !== key;
+  const isDimmed = (key: string) => focusedSeries !== null && focusedSeries !== key;
   const colorSet = useMemo(() => {
-    const forecastStroke = "#c25b00";
     const trainStroke = "#222";
-    const testStroke = warmColor ?? "#524b41";
+    const testStroke = warmColor ?? _secondaryColor ?? "#524b41";
     const fitStroke = "#8c7968";
-    const bandFill = hexToRgba("#c25b00", 0.1);
+    const bandFill = hexToRgba(primaryStroke, 0.1);
     return {
-      forecast: forecastStroke,
       train: trainStroke,
       test: testStroke,
       fit: fitStroke,
-      bandFills: [bandFill],
+      bandFills: [bandFill, hexToRgba(primaryStroke, 0.07), hexToRgba(primaryStroke, 0.05)],
     };
-  }, [warmColor]);
+  }, [primaryStroke, warmColor, _secondaryColor]);
 
-  const strokeFor = (key: SeriesKey, color: string) => (isDimmed(key) ? "#7d7368" : color);
-  const opacityFor = (key: SeriesKey) => (isDimmed(key) ? 0.35 : 1);
+  const strokeFor = (key: string, color: string) => (isDimmed(key) ? "#7d7368" : color);
+  const opacityFor = (key: string) => (isDimmed(key) ? 0.35 : 1);
   const hasData = data.length > 0;
   const tickerItems = [
     { label: "Model", value: modelLabel ?? moduleBadge },
@@ -271,7 +331,7 @@ export const ForecastChart = ({
     { label: "RMSE", value: formatMetric(metrics?.rmse) },
     { label: "Time", value: runDurationMs ? `${(runDurationMs / 1000).toFixed(1)}s` : "-" },
   ];
-  const showSkeleton = loading;
+  const showSkeleton = loading && history.length === 0 && forecastSeries.length === 0;
 
   return (
     <div className="timeline-card panel relative box-border h-[440px] overflow-hidden p-6" aria-busy={loading}>
@@ -291,7 +351,7 @@ export const ForecastChart = ({
           <span className="pill border-slate-300 bg-slate-100 text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100">
             {moduleBadge}
           </span>
-          {forecast && (
+          {primaryForecast && (
             <span className="pill border-slate-300 bg-slate-100 text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100">
               {testSplitBadge}
             </span>
@@ -301,7 +361,7 @@ export const ForecastChart = ({
               {testSet.length} test points
             </span>
           )}
-          {forecast?.config.log_transform && (
+          {primaryForecast?.config.log_transform && (
             <span className="pill border-slate-300 bg-slate-100 text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100">
               log1p
             </span>
@@ -325,9 +385,14 @@ export const ForecastChart = ({
 
       <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
         {[
-          { key: "train" as SeriesKey, label: "Train actuals", disabled: data.length === 0 },
-          { key: "test" as SeriesKey, label: "Test actuals", disabled: testSet.length === 0 },
-          { key: "forecast" as SeriesKey, label: "Forecast", disabled: !forecast },
+          { key: "train", label: "Train actuals", disabled: data.length === 0 },
+          { key: "test", label: "Test actuals", disabled: testSet.length === 0 },
+          { key: "fit", label: "Train fit", disabled: !primaryForecast?.fitted },
+          ...forecastSeries.map((series) => ({
+            key: series.dataKey,
+            label: series.label,
+            disabled: false,
+          })),
         ].map(({ key, label, disabled }) => {
           const active = focusedSeries === key;
           return (
@@ -351,29 +416,29 @@ export const ForecastChart = ({
       <div className="mt-3 flex flex-wrap items-center gap-4 text-xs text-slate-700 dark:text-slate-200">
         {[
           {
-            key: "train" as SeriesKey,
+            key: "train",
             label: "Train actuals",
             color: colorSet.train,
             hidden: data.length === 0,
           },
           {
-            key: "test" as SeriesKey,
+            key: "test",
             label: "Test actuals",
             color: colorSet.test,
             hidden: testSet.length === 0,
           },
           {
-            key: "forecast" as SeriesKey,
-            label: "Forecast",
-            color: colorSet.forecast,
-            hidden: !forecast,
-          },
-          {
-            key: "fit" as SeriesKey,
+            key: "fit",
             label: "Train fit",
             color: colorSet.fit,
-            hidden: !forecast?.fitted,
+            hidden: !primaryForecast?.fitted,
           },
+          ...forecastSeries.map((series) => ({
+            key: series.dataKey,
+            label: series.label,
+            color: series.color,
+            hidden: false,
+          })),
         ]
           .filter(({ hidden }) => !hidden)
           .map(({ key, label, color }) => (
@@ -411,9 +476,9 @@ export const ForecastChart = ({
             <LineChart data={data} margin={{ top: 10, right: 24, left: 0, bottom: 0 }}>
               <defs>
                 <linearGradient id="forecastGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#c25b00" stopOpacity={0.28} />
-                  <stop offset="50%" stopColor="#c25b00" stopOpacity={0.12} />
-                  <stop offset="100%" stopColor="#c25b00" stopOpacity={0} />
+                  <stop offset="0%" stopColor={primaryStroke} stopOpacity={0.28} />
+                  <stop offset="50%" stopColor={primaryStroke} stopOpacity={0.12} />
+                  <stop offset="100%" stopColor={primaryStroke} stopOpacity={0} />
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="4 4" stroke="#b0a899" strokeOpacity={0.45} />
@@ -426,17 +491,25 @@ export const ForecastChart = ({
               <YAxis tick={{ fill: "#5c564d", fontSize: 11 }} />
               <Tooltip
                 labelFormatter={formatLabel}
-                content={(props) => <ForecastTooltip intervalLevels={intervalLevels} {...props} />}
+                content={(props) => (
+                  <ForecastTooltip
+                    intervalLevels={intervalLevels}
+                    forecastSeries={forecastSeries}
+                    {...props}
+                  />
+                )}
               />
-              <Area
-                type="monotone"
-                dataKey="forecast"
-                stroke="none"
-                fill="url(#forecastGradient)"
-                fillOpacity={isDimmed("forecast") ? 0.25 : 0.65}
-                isAnimationActive={!loading}
-                animationDuration={1400}
-              />
+              {primarySeries ? (
+                <Area
+                  type="monotone"
+                  dataKey={primarySeries.dataKey}
+                  stroke="none"
+                  fill="url(#forecastGradient)"
+                  fillOpacity={isDimmed(primarySeries.dataKey) ? 0.25 : 0.65}
+                  isAnimationActive={!loading}
+                  animationDuration={1400}
+                />
+              ) : null}
               {intervalLevels.map((lvl, idx) => (
                 <Area
                   key={`band-${lvl}`}
@@ -445,7 +518,9 @@ export const ForecastChart = ({
                   isRange
                   stroke="none"
                   fill={colorSet.bandFills[idx % colorSet.bandFills.length]}
-                  fillOpacity={isDimmed("forecast") ? 0.18 : (bandOpacityByLevel.get(lvl) ?? 0.32)}
+                  fillOpacity={
+                    isDimmed(primaryDataKey) ? 0.18 : bandOpacityByLevel.get(lvl) ?? 0.32
+                  }
                   isAnimationActive={!loading}
                   animationDuration={1000 + idx * 120}
                   legendType="none"
@@ -475,7 +550,7 @@ export const ForecastChart = ({
                   animationDuration={1200}
                 />
               )}
-              {forecast?.fitted && (
+              {primaryForecast?.fitted && (
                 <Line
                   type="monotone"
                   dataKey="trainPrediction"
@@ -489,19 +564,22 @@ export const ForecastChart = ({
                   animationDuration={1200}
                 />
               )}
-              <Line
-                type="monotone"
-                dataKey="forecast"
-                stroke={strokeFor("forecast", colorSet.forecast)}
-                strokeOpacity={opacityFor("forecast")}
-                strokeWidth={2.5}
-                dot={false}
-                name="Forecast"
-                className="line-glow"
-                isAnimationActive={!loading}
-                animationDuration={1500}
-                strokeLinecap="round"
-              />
+              {forecastSeries.map((series, idx) => (
+                <Line
+                  key={series.dataKey}
+                  type="monotone"
+                  dataKey={series.dataKey}
+                  stroke={strokeFor(series.dataKey, series.color)}
+                  strokeOpacity={opacityFor(series.dataKey)}
+                  strokeWidth={series.dataKey === primaryDataKey ? 2.8 : 2}
+                  dot={false}
+                  name={series.label}
+                  className={series.dataKey === primaryDataKey ? "line-glow" : undefined}
+                  isAnimationActive={!loading}
+                  animationDuration={1400 + idx * 80}
+                  strokeLinecap="round"
+                />
+              ))}
             </LineChart>
           </ResponsiveContainer>
         ) : (

@@ -21,7 +21,7 @@ import { SampleDatasetPicker } from "./components/SampleDatasetPicker";
 import { TopKpiRow } from "./components/TopKpiRow";
 import { useForecast } from "./hooks/useForecast";
 import { useRunForecast } from "./hooks/useRunForecast";
-import type { ForecastConfigState } from "./types";
+import type { ForecastConfigState, ForecastRun } from "./types";
 
 
 
@@ -113,7 +113,7 @@ const buildSettingsTooltip = (settings: ForecastConfigState) => {
 
 
 
-const mapForecastRows = (forecast: ReturnType<typeof useForecast>["forecast"]) => {
+const mapForecastRows = (forecast: ForecastRun | null) => {
 
   if (!forecast) return { data: [], intervals: [] as number[] };
 
@@ -167,53 +167,6 @@ const mapForecastRows = (forecast: ReturnType<typeof useForecast>["forecast"]) =
 
 };
 
-
-
-const moduleStyles: Record<
-
-  ForecastConfigState["module_type"],
-
-  { label: "ECON" | "ML" | "DL"; badge: string; dot: string }
-
-> = {
-
-  StatsForecast: {
-
-    label: "ECON",
-
-    badge:
-
-      "bg-[var(--kaito-surface)] text-[var(--kaito-ink)] border-[var(--kaito-border)]",
-
-    dot: "bg-[#c7b299]",
-
-  },
-
-  MLForecast: {
-
-    label: "ML",
-
-    badge:
-
-      "bg-[var(--kaito-surface)] text-[var(--kaito-ink)] border-[var(--kaito-border)]",
-
-    dot: "bg-[#9aad90]",
-
-  },
-
-  NeuralForecast: {
-
-    label: "DL",
-
-    badge:
-
-      "bg-[var(--kaito-surface)] text-[var(--kaito-ink)] border-[var(--kaito-border)]",
-
-    dot: "bg-[#9aa0b5]",
-
-  },
-
-};
 
 
 
@@ -291,7 +244,9 @@ export const App = () => {
 
     history,
 
-    forecast,
+    forecast: latestForecast,
+
+    forecastHistory,
 
     batchResult,
 
@@ -371,47 +326,19 @@ export const App = () => {
 
 
 
-  const forecastRows = useMemo(() => mapForecastRows(forecast), [forecast]);
+  const forecastRows = useMemo(() => mapForecastRows(latestForecast), [latestForecast]);
 
   const intervalLabel = useMemo(
 
     () =>
 
-      forecast?.bounds?.length ? `${forecast.bounds[forecast.bounds.length - 1].level}%` : "-",
+      latestForecast?.bounds?.length
+        ? `${latestForecast.bounds[latestForecast.bounds.length - 1].level}%`
+        : "-",
 
-    [forecast],
+    [latestForecast],
 
   );
-
-  const sourceLabel = useMemo(() => {
-
-    if (selectedDataset) return `Sample: ${selectedDataset.name}`;
-
-    if (dataSource === "upload") return "Uploaded CSV";
-
-    return "No data source yet";
-
-  }, [dataSource, selectedDataset]);
-
-  const strategyLabel = useMemo(() => {
-
-    switch (config.strategy) {
-
-      case "multi_step_recursive":
-
-        return "Recursive";
-
-      case "multi_output_direct":
-
-        return "Direct multi-output";
-
-      default:
-
-        return "One step";
-
-    }
-
-  }, [config.strategy]);
 
   const testSeries = useMemo(() => {
 
@@ -559,18 +486,6 @@ export const App = () => {
 
   };
 
-  const scrollToUpload = () => {
-
-    const el = document.getElementById("upload-card");
-
-    if (el) {
-
-      el.scrollIntoView({ behavior: "smooth", block: "start" });
-
-    }
-
-  };
-
   const handleBenchmarkRun = () => {
 
     if (!activeBenchmarkConfigs.length) {
@@ -667,7 +582,7 @@ export const App = () => {
 
       ? "Training model..."
 
-      : forecast
+      : latestForecast
 
         ? "Forecast ready"
 
@@ -679,19 +594,19 @@ export const App = () => {
 
   const bestMetric = useMemo(() => {
 
-    const rmse = forecast?.metrics?.rmse;
+    const rmse = latestForecast?.metrics?.rmse;
 
     if (rmse !== null && rmse !== undefined && !Number.isNaN(rmse))
 
       return `RMSE ${rmse.toFixed(3)}`;
 
-    const mae = forecast?.metrics?.mae;
+    const mae = latestForecast?.metrics?.mae;
 
     if (mae !== null && mae !== undefined && !Number.isNaN(mae)) return `MAE ${mae.toFixed(3)}`;
 
     return "No metrics yet";
 
-  }, [forecast?.metrics]);
+  }, [latestForecast?.metrics]);
 
   const forecastTableRows = useMemo(
     () =>
@@ -705,15 +620,19 @@ export const App = () => {
 
   useEffect(() => {
 
-    if (!forecast) return;
+    if (!latestForecast) return;
 
-    const key = `${forecast.config.module_type}-${forecast.config.model_type}-${forecast.timestamps?.[0] ?? ""}-${forecast.forecast?.length ?? 0}`;
+    const key =
+
+      latestForecast.runId ||
+
+      `${latestForecast.config.module_type}-${latestForecast.config.model_type}-${latestForecast.timestamps?.[0] ?? ""}-${latestForecast.forecast?.length ?? 0}`;
 
     if (lastLeaderboardKey.current === key) return;
 
     lastLeaderboardKey.current = key;
 
-    const createdAt = Date.now();
+    const createdAt = latestForecast.createdAt ?? Date.now();
 
     setLeaderboard((prev) => [
 
@@ -723,19 +642,19 @@ export const App = () => {
 
         id: `${createdAt}-${key}`,
 
-        model: forecast.config.model_type.toUpperCase(),
+        model: latestForecast.config.model_type.toUpperCase(),
 
-        module: forecast.config.module_type,
+        module: latestForecast.config.module_type,
 
-        rmse: forecast.metrics?.rmse,
+        rmse: latestForecast.metrics?.rmse,
 
-        mae: forecast.metrics?.mae,
+        mae: latestForecast.metrics?.mae,
 
-        mape: forecast.metrics?.mape,
+        mape: latestForecast.metrics?.mape,
 
-        duration: lastRunMs ?? null,
+        duration: latestForecast.durationMs ?? lastRunMs ?? null,
 
-        settings: forecast.config,
+        settings: latestForecast.config,
 
         createdAt,
 
@@ -743,7 +662,19 @@ export const App = () => {
 
     ]);
 
-  }, [forecast, lastRunMs]);
+  }, [latestForecast, lastRunMs]);
+
+  useEffect(() => {
+
+    if (forecastHistory.length === 0) {
+
+      setLeaderboard([]);
+
+      lastLeaderboardKey.current = null;
+
+    }
+
+  }, [forecastHistory.length]);
 
   const leaderboardRows = useMemo(() => {
 
@@ -775,8 +706,6 @@ export const App = () => {
 
 
 
-  const moduleMeta = moduleStyles[config.module_type];
-
   const handleLoadLeaderboardConfig = (entry: LeaderboardEntry) => {
 
     updateConfig(entry.settings);
@@ -791,17 +720,19 @@ export const App = () => {
 
   const confidenceLabel = intervalLabel || "—";
 
-  const intervalColumns = forecastRows.intervals.length ? forecastRows.intervals : config.level ?? [];
+  const intervalColumns = forecastRows.intervals.length
+    ? forecastRows.intervals
+    : latestForecast?.config.level ?? config.level ?? [];
 
 
 
   return (
     <div className={isDark ? "dark" : ""}>
       <PageWrapper className="kaito-shell relative min-h-screen bg-[var(--kaito-bg)] text-[var(--kaito-ink)] transition-colors duration-500 dark:bg-slate-950 dark:text-slate-200">
-        <div className="flex min-h-screen">
+        <div className="flex min-h-screen flex-col items-stretch lg:flex-row">
           <motion.aside
             variants={itemVariants}
-            className="hidden w-72 flex-col border-r border-[var(--kaito-border)] bg-[var(--kaito-subtle)] px-5 py-6 shadow-[12px_0_30px_rgba(0,0,0,0.04)] lg:flex dark:border-slate-800 dark:bg-slate-900/40"
+            className="w-full shrink-0 overflow-y-auto border-b border-[var(--kaito-border)] bg-[var(--kaito-subtle)] px-5 py-6 shadow-[0_10px_24px_rgba(0,0,0,0.04)] no-scrollbar min-h-screen lg:min-h-screen lg:w-80 lg:min-w-[320px] lg:flex-shrink-0 lg:border-b-0 lg:border-r lg:shadow-[12px_0_30px_rgba(0,0,0,0.04)] dark:border-slate-800 dark:bg-slate-900/40"
           >
             <Link to="/" className="group flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#1f1c19] font-semibold text-white shadow-sm shadow-black/20 transition group-hover:translate-y-[-2px] group-hover:shadow-lg">
@@ -815,145 +746,37 @@ export const App = () => {
               </div>
             </Link>
 
-
-
-            <div className="mt-6 space-y-3">
-
-              <div className="panel-subtle p-3">
-
-                <p className="card-title">Data status</p>
-
-                <div className="mt-1 flex items-center justify-between">
-
-                  <div className="shrink-0">
-
-                    <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-
-                      {sourceLabel}
-
-                    </p>
-
-                    <p className="text-xs text-slate-600 dark:text-slate-300">
-
-                      {rows ? `${rows} rows` : "Load a sample or upload"}
-
-                    </p>
-
-                  </div>
-
-                  <span className={`h-2 w-2 rounded-full ${moduleMeta.dot}`} />
-
-                </div>
-
+            <div className="mt-6 space-y-4 pb-4">
+              <div className="panel-subtle p-4">
+                <p className="card-title">Forecast setup</p>
+                <p className="text-sm text-[var(--kaito-muted)] dark:text-slate-300">
+                  Load data, upload a CSV, and tune the run without leaving the sidebar.
+                </p>
               </div>
 
-              <div className="panel-subtle p-3 space-y-2">
+              <SampleDatasetPicker
+                datasets={datasets}
+                activeId={selectedDataset?.id ?? null}
+                loadingId={sampleLoading}
+                error={datasetsError}
+                onSelect={loadSampleDataset}
+              />
 
-                <div className="flex items-center justify-between text-sm text-slate-700 dark:text-slate-200">
-
-                  <span className="font-semibold shrink-0">Module</span>
-
-                  <span
-
-                    className={`rounded-full border px-2 py-0.5 text-[11px] font-semibold ${moduleMeta.badge}`}
-
-                  >
-
-                    {moduleMeta.label}
-
-                  </span>
-
-                </div>
-
-                <div className="flex items-center justify-between text-sm text-slate-700 dark:text-slate-200">
-
-                  <span className="font-semibold shrink-0">Strategy</span>
-
-                  <span className="font-mono text-xs text-slate-600 dark:text-slate-400">
-
-                    {strategyLabel}
-
-                  </span>
-
-                </div>
-
-                <div className="flex items-center justify-between text-sm text-slate-700 dark:text-slate-200">
-
-                  <span className="font-semibold shrink-0">Bands</span>
-
-                  <span className="font-mono text-xs text-slate-600 dark:text-slate-400">
-
-                    {intervalLabel}
-
-                  </span>
-
-                </div>
-
-                <div className="flex items-center justify-between text-sm text-slate-700 dark:text-slate-200">
-
-                  <span className="font-semibold shrink-0">Best metric</span>
-
-                  <span className="font-mono text-xs text-emerald-600 dark:text-emerald-400">
-
-                    {bestMetric}
-
-                  </span>
-
-                </div>
-
+              <div id="upload-card">
+                <FileUpload onUpload={uploadFile} loading={loading === "upload"} preview={preview} rows={rows} />
               </div>
 
+              <ConfigPanel
+                config={config}
+                onChange={updateConfig}
+                onRun={() => triggerForecast(undefined)}
+                running={loading === "forecast" || isRunPending}
+                dataReady={hasDataLoaded}
+                detectedFreq={detectedFreq ?? selectedDataset?.freq ?? null}
+                disabled={loading === "upload" || isRunPending}
+              />
             </div>
-
-
-
-            <div className="mt-auto space-y-2 text-xs text-slate-600 dark:text-slate-200">
-
-              {hasDataLoaded ? (
-
-                <p>
-
-                  Need a new dataset? Jump to the cards in the center column to switch samples or
-
-                  upload again.
-
-                </p>
-
-              ) : (
-
-                <p>
-
-                  Pick a sample or upload in the main area to get started. Controls here will appear
-
-                  after data loads.
-
-                </p>
-
-              )}
-
-              {!hasDataLoaded ? (
-
-                <button
-
-                  type="button"
-
-                  onClick={scrollToUpload}
-
-                  className="mt-1 inline-flex items-center gap-2 rounded-full border border-[var(--kaito-border)] px-4 py-2 text-sm font-semibold uppercase tracking-[0.04em] text-[var(--kaito-ink)] transition hover:shadow-[0_10px_24px_rgba(0,0,0,0.06)]"
-
-                >
-
-                  Upload CSV
-
-                </button>
-
-              ) : null}
-
-            </div>
-
           </motion.aside>
-
-
 
           <motion.main variants={itemVariants} className="flex min-w-0 flex-1 flex-col">
             <header className="sticky top-0 z-20 flex h-16 items-center justify-between border-b border-[var(--kaito-border)] bg-[var(--kaito-surface)] px-6 shadow-[0_10px_26px_rgba(0,0,0,0.06)] dark:border-slate-800 dark:bg-slate-950/70">
@@ -1005,53 +828,24 @@ export const App = () => {
 
                   <ForecastChart
                     history={history}
-                    forecast={forecast}
+                    forecasts={forecastHistory}
                     testSet={testSeries}
                     accentColor="#37413a"
                     secondaryColor="#7c8172"
                     warmColor="#b08968"
-                    metrics={forecast?.metrics}
+                    metrics={latestForecast?.metrics}
                     modelLabel={
-                      forecast ? forecast.config.model_type.toUpperCase() : config.model_type.toUpperCase()
+                      latestForecast
+                        ? latestForecast.config.model_type.toUpperCase()
+                        : config.model_type.toUpperCase()
                     }
-                    runDurationMs={lastRunMs}
+                    runDurationMs={latestForecast?.durationMs ?? lastRunMs}
                     loading={loading === "forecast"}
                     onQuickStart={firstDataset ? handleQuickStart : undefined}
                     quickLabel={firstDataset ? `Try ${firstDataset.name}` : undefined}
                   />
 
-                  <div className="grid grid-cols-1 gap-4 lg:grid-cols-[420px,1fr]">
-                    <div className="relative space-y-4 lg:pr-2">
-                      <div className="space-y-4 pb-28">
-                        <SampleDatasetPicker
-                          datasets={datasets}
-                          activeId={selectedDataset?.id ?? null}
-                          loadingId={sampleLoading}
-                          error={datasetsError}
-                          onSelect={loadSampleDataset}
-                        />
-
-                        <div id="upload-card">
-                          <FileUpload
-                            onUpload={uploadFile}
-                            loading={loading === "upload"}
-                            preview={preview}
-                            rows={rows}
-                          />
-                        </div>
-
-                        <ConfigPanel
-                          config={config}
-                          onChange={updateConfig}
-                          onRun={() => triggerForecast(undefined)}
-                          running={loading === "forecast" || isRunPending}
-                          dataReady={hasDataLoaded}
-                          detectedFreq={detectedFreq ?? selectedDataset?.freq ?? null}
-                          disabled={loading === "upload" || isRunPending}
-                        />
-                      </div>
-                    </div>
-
+                  <div className="mt-8 space-y-6">
                     <div className="panel p-4">
                       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                         <div>
@@ -1062,10 +856,10 @@ export const App = () => {
                         </div>
 
                         <div className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
-                          {forecast ? (
+                          {latestForecast ? (
                             <>
                               <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-                              <span>Using {forecast.config.model_type.toUpperCase()}</span>
+                              <span>Using {latestForecast.config.model_type.toUpperCase()}</span>
                             </>
                           ) : (
                             <>
@@ -1094,7 +888,7 @@ export const App = () => {
                         </button>
                       </div>
 
-                      {!forecast && (
+                      {!latestForecast && (
                         <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 dark:border-slate-800 dark:bg-slate-900/70 dark:text-slate-200">
                           {config.module_type === "StatsForecast" && (
                             <p>
@@ -1131,12 +925,14 @@ export const App = () => {
 
                           <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                             <div className="text-xs text-slate-600 dark:text-slate-400">
-                              {forecast ? "Download this horizon as CSV." : "CSV export available after a run."}
+                              {latestForecast
+                                ? "Download this horizon as CSV."
+                                : "CSV export available after a run."}
                             </div>
                             <button
                               type="button"
                               disabled={!forecastRows.data.length}
-                              onClick={() => buildDownloadCsv(config, forecastRows)}
+                              onClick={() => buildDownloadCsv(latestForecast?.config ?? config, forecastRows)}
                               className="inline-flex items-center gap-2 rounded-full border border-[var(--kaito-border)] px-4 py-2 text-sm font-semibold uppercase tracking-[0.04em] text-[var(--kaito-ink)] transition hover:shadow-[0_10px_24px_rgba(0,0,0,0.06)] disabled:cursor-not-allowed disabled:opacity-60"
                             >
                               <Download className="h-4 w-4" />
@@ -1208,10 +1004,9 @@ export const App = () => {
                         </div>
                       )}
                     </div>
-                  </div>
 
-                  <div className="panel p-4">
-                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="panel p-4">
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                       <div>
                         <p className="card-title">Benchmark &amp; Backtest</p>
                         <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
@@ -1449,16 +1244,13 @@ export const App = () => {
                 </div>
               </div>
             </div>
+          </div>
           </motion.main>
+        </div>
+      </PageWrapper>
     </div>
-  </PageWrapper>
-</div>
-
   );
-
 };
-
-
 
 export default App;
 
