@@ -8,7 +8,6 @@
 Forecast lab built with React and FastAPI: upload a CSV, map your `ds` and `y` columns, and run StatsForecast, MLForecast, or NeuralForecast models with side-by-side benchmarks, rolling backtests, and confidence bands.
 
 ## Project Map
-Copy-paste friendly visual of the layout:
 ```
 DeepForecasting_Webapp
 |-- backend/          FastAPI + Nixtla stack
