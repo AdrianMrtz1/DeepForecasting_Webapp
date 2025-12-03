@@ -54,7 +54,7 @@ Backend flow
 - Outputs: timestamps + forecasts + optional confidence intervals; metrics include MAE/RMSE/MAPE on holdout/backtest slices. Leaderboards rank primarily by RMSE.
 
 Evaluation & backtesting
-- Holdout split: fraction of rows (capped to leave ≥1 train point) or defaults to `min(horizon, n-1)`. Metrics align lengths; MAPE skips zero actuals.
+- Holdout split: fraction of rows (capped to leave >=1 train point) or defaults to `min(horizon, n-1)`. Metrics align lengths; MAPE skips zero actuals.
 - Backtests: rolling windows from the tail; each window trains on earlier rows and tests the next horizon, advancing by `step_size`. Aggregates average metrics across windows.
 - One-step option mimics iterative real-time evaluation by re-including each actual before predicting the next step.
 
@@ -65,7 +65,7 @@ Frontend flow
 - `ForecastDashboard.tsx` orchestrates: KPI cards, chart (`ForecastChart.tsx`), data table (`ForecastDataTable.tsx`), benchmark/backtest controls, leaderboard tabs, and run/export actions. `useRunForecast` wraps runs with toast feedback. Theme/tokens in `frontend/src/index.css`; layout components (`Layout.tsx`, `PageWrapper.tsx`) frame the shell.
 
 Typical user workflow
-- Upload CSV or pick a sample dataset → backend validates and infers freq → UI sets preview/history and suggested config.
+- Upload CSV or pick a sample dataset -> backend validates and infers freq -> UI sets preview/history and suggested config.
 - Adjust config in the panel (module/model, horizon, freq/seasonality, missing handling, test split, log transform, strategy, module-specific hyperparams).
 - Run a single forecast (metrics + bounds + fitted optional); optionally export CSV.
 - Benchmark multiple presets (e.g., AutoARIMA, AutoETS, LightGBM, GRU) via `/forecast/batch` to get a ranked leaderboard.
