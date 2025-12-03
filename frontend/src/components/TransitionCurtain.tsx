@@ -1,8 +1,5 @@
-import { motion, useAnimationControls, usePresence } from "framer-motion";
-import { useEffect } from "react";
+import { motion } from "framer-motion";
 import { useLocation } from "react-router-dom";
-
-import { fluidEase } from "./PageWrapper";
 
 // 1. Define your page titles here
 const PAGE_TITLES: Record<string, string> = {
@@ -12,101 +9,64 @@ const PAGE_TITLES: Record<string, string> = {
 };
 
 export const TransitionCurtain = () => {
-  const [isPresent, safeToRemove] = usePresence();
-  const curtainControls = useAnimationControls();
-  const textControls = useAnimationControls();
   const location = useLocation();
-
-  // 2. Determine the title based on the current path
   const title = PAGE_TITLES[location.pathname] || "DeepCast";
 
-  useEffect(() => {
-    const playEntrance = async () => {
-      curtainControls.set({ y: "100%" });
-      textControls.set({ opacity: 0, y: 16 });
-
-      // Cover the screen
-      await curtainControls.start({
-        y: "0%",
-        transition: { duration: 0.5, ease: fluidEase },
-      });
-
-      // Bring the title in while the screen is covered
-      await textControls.start({
-        opacity: 1,
-        y: 0,
-        transition: { duration: 0.35, ease: "easeOut", delay: 0.05 },
-      });
-
-      // Hold briefly so the title is readable while the curtain is covering
-      await new Promise((resolve) => setTimeout(resolve, 200));
-
-      // Lift the curtain away
-      await curtainControls.start({
-        y: "-100%",
-        transition: { duration: 0.6, ease: [0.83, 0, 0.17, 1], delay: 0.05 },
-      });
-
-      // Gently fade the title as the curtain clears
-      await textControls.start({
-        opacity: 0,
-        y: -14,
-        transition: { duration: 0.25, ease: "easeInOut" },
-      });
-    };
-
-    const playExit = async () => {
-      // Snap the curtain back to cover, then slide away while removing
-      curtainControls.set({ y: "0%" });
-      textControls.set({ opacity: 1, y: 0 });
-
-      await curtainControls.start({
-        y: "-100%",
-        transition: { duration: 0.55, ease: [0.76, 0, 0.24, 1] },
-      });
-
-      await textControls.start({
-        opacity: 0,
-        y: -12,
-        transition: { duration: 0.2, ease: "easeIn" },
-      });
-
-      safeToRemove();
-    };
-
-    if (isPresent) {
-      void playEntrance();
-    } else {
-      void playExit();
-    }
-  }, [curtainControls, textControls, isPresent, safeToRemove, location.pathname]);
+  // Common transition settings for sync
+  // Using a slightly slower ease for a "heavy" premium feel
+  const curtainTransition = { duration: 0.8, ease: [0.76, 0, 0.24, 1] };
 
   return (
-    <motion.div
-      aria-hidden
-      // 3. Flex container to center the text
-      className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--paper-ink)] text-[var(--paper-bg)]"
-      initial={{ y: "100%" }}
-      animate={curtainControls}
-    >
-      {/* 4. Text Animation Container */}
+    <>
+      {/* ENTRANCE CURTAIN (The Reveal)
+        - Active when the NEW page mounts.
+        - Starts at 0% (Covering screen) to match the Exit Curtain's end position.
+        - Slides to -100% (Up) to reveal the new content.
+      */}
       <motion.div
-        className="flex flex-col items-center gap-2"
-        initial={{ opacity: 0, y: 16 }}
-        animate={textControls}
+        className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--paper-ink)] text-[var(--paper-bg)] pointer-events-none"
+        initial={{ y: "0%" }}
+        animate={{ y: "-100%" }}
+        transition={curtainTransition}
+        aria-hidden
       >
-        <h1 className="kaito-serif text-4xl font-light tracking-tight md:text-6xl">
-          {title}
-        </h1>
-
-        {/* Optional decorative loading line */}
+        {/* Text reveals/hides opposite to curtain movement */}
         <motion.div
-          className="h-[1px] w-12 bg-[var(--paper-bg)]/30"
-          initial={{ width: 0 }}
-          animate={{ width: 48 }}
-          transition={{ duration: 0.4, delay: 0.3 }}
-        />
+          initial={{ opacity: 1, y: 0 }}
+          animate={{ opacity: 0, y: -60 }}
+          transition={{ duration: 0.5, ease: "easeIn" }}
+          className="flex flex-col items-center gap-2"
+        >
+          <h1 className="kaito-serif text-4xl font-light tracking-tight md:text-6xl">
+            {title}
+          </h1>
+        </motion.div>
       </motion.div>
-    </motion.div>
+
+      {/* EXIT CURTAIN (The Cover)
+        - Active when the OLD page unmounts.
+        - Starts at 100% (Hidden at bottom).
+        - Slides to 0% (Covering screen).
+      */}
+      <motion.div
+        className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--paper-ink)] text-[var(--paper-bg)] pointer-events-none"
+        initial={{ y: "100%" }}
+        animate={{ y: "100%" }} // Stays at bottom while page is active
+        exit={{ y: "0%" }} // Slides up to cover on exit
+        transition={curtainTransition}
+        aria-hidden
+      >
+        <motion.div
+          initial={{ opacity: 0, y: 60 }}
+          exit={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.1, ease: "easeOut" }}
+          className="flex flex-col items-center gap-2"
+        >
+          <h1 className="kaito-serif text-4xl font-light tracking-tight md:text-6xl">
+            {title}
+          </h1>
+        </motion.div>
+      </motion.div>
+    </>
   );
 };

@@ -13,14 +13,20 @@ const RoutedViews = () => {
   const location = useLocation();
 
   return (
+    // mode="wait" ensures the exit animation (curtain covering) finishes
+    // before the new component mounts (curtain revealing).
     <AnimatePresence mode="wait">
       <motion.div key={location.pathname} className="relative">
         <TransitionCurtain />
         <motion.div
-          initial={{ opacity: 0, y: 24, filter: "blur(6px)" }}
-          animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-          exit={{ opacity: 0, y: -16, filter: "blur(6px)" }}
-          transition={{ duration: 0.7, ease: fluidEase, delay: 0.35 }}
+          // Entrance: Fade in slightly delayed so it appears behind the lifting curtain
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.4, ease: fluidEase, delay: 0.3 }}
+
+          // Exit: DO NOT fade out. Stay visible (opacity 1) while the Exit Curtain covers the screen.
+          // The duration (0.8s) matches the curtain transition time.
+          exit={{ opacity: 1, transition: { duration: 0.8 } }}
         >
           <Routes location={location}>
             <Route element={<Layout />}>
