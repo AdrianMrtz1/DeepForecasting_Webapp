@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 
 import { PageWrapper, itemVariants } from "../components/PageWrapper";
 
-const noteMarkdown = `
+const noteMarkdown = String.raw`
 # Deep Forecasting Web App
 
 React + FastAPI lab: upload a CSV, map \`ds\`/\`y\`, and run StatsForecast, MLForecast, or NeuralForecast models with benchmarks, rolling backtests, and confidence bands.
@@ -23,8 +23,8 @@ DeepForecasting_Webapp
 |   |   |-- models.py             # model registry and schemas
 |   |   |-- sample_data.py        # bundled datasets metadata
 |   |   |-- services/             # forecasting + backtesting helpers
-|   |   `-- utils/                # shared parsing/validation
-|   `-- tests/                    # pytest suites
+|   |   \`-- utils/                # shared parsing/validation
+|   \`-- tests/                    # pytest suites
 |
 |-- frontend/         Vite + React + Tailwind UI
 |   |-- src/
@@ -32,8 +32,8 @@ DeepForecasting_Webapp
 |   |   |-- hooks/                # data fetching and state helpers
 |   |   |-- pages/                # dashboard shell
 |   |   |-- ForecastDashboard.tsx # main experience
-|   |   `-- index.css             # theme tokens + globals
-|   `-- public/
+|   |   \`-- index.css             # theme tokens + globals
+|   \`-- public/
 |
 \`-- README.md
 \`\`\`
@@ -64,7 +64,7 @@ DeepForecasting_Webapp
 - Outputs: timestamps + forecasts + optional confidence intervals; metrics MAE/RMSE/MAPE. Leaderboards rank by RMSE then MAE.
 
 ### Evaluation & backtesting
-- Holdout split: fraction of rows (capped to leave ≥1 train point) or \`min(horizon, n-1)\`; metrics align lengths; MAPE skips zero actuals.
+- Holdout split: fraction of rows (capped to leave >=1 train point) or \`min(horizon, n-1)\`; metrics align lengths; MAPE skips zero actuals.
 - Backtests: rolling windows from the tail, training on past rows and testing the next horizon; advance by \`step_size\`; averages metrics across windows.
 - One-step mirrors iterative real-time: re-include each actual before predicting the next step.
 
@@ -75,7 +75,7 @@ DeepForecasting_Webapp
 - \`ForecastDashboard.tsx\`: KPIs, chart, table, benchmark/backtest controls, leaderboard tabs, CSV export; \`useRunForecast\` wraps runs with toasts; theme/tokens in \`src/index.css\`.
 
 ### Typical user workflow
-- Upload CSV or pick a sample → backend validates + infers freq → UI sets preview/history and suggested config.
+- Upload CSV or pick a sample -> backend validates + infers freq -> UI sets preview/history and suggested config.
 - Adjust config (module/model, horizon, freq/seasonality, missing handling, test split, log transform, strategy, hyperparams).
 - Run a single forecast (metrics + bounds + fitted optional) and optionally export CSV.
 - Benchmark multiple presets via \`/forecast/batch\`; get ranked leaderboard.
