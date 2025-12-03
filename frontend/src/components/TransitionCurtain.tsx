@@ -4,79 +4,104 @@ import { useLocation } from "react-router-dom";
 
 import { fluidEase } from "./PageWrapper";
 
-// Map paths to display titles
-const ROUTE_TITLES: Record<string, string> = {
+// 1. Define your page titles here
+const PAGE_TITLES: Record<string, string> = {
   "/": "Home",
-  "/notes": "Field Notes",
+  "/notes": "Notes",
   "/forecast": "Forecast Lab",
 };
 
 export const TransitionCurtain = () => {
   const [isPresent, safeToRemove] = usePresence();
-  const controls = useAnimationControls();
+  const curtainControls = useAnimationControls();
+  const textControls = useAnimationControls();
   const location = useLocation();
 
-  // Determine title based on current path, fallback to "DeepCast"
-  const title = ROUTE_TITLES[location.pathname] || "DeepCast";
+  // 2. Determine the title based on the current path
+  const title = PAGE_TITLES[location.pathname] || "DeepCast";
 
   useEffect(() => {
-    if (!isPresent) {
-      // EXIT: The curtain slides up away to reveal the new page
-      controls
-        .start({
-          y: "-100%",
-          transition: { duration: 0.5, ease: [0.76, 0, 0.24, 1] },
-        })
-        .then(() => safeToRemove());
-      return;
-    }
+    const playEntrance = async () => {
+      curtainControls.set({ y: "100%" });
+      textControls.set({ opacity: 0, y: 16 });
 
-    // ENTRANCE: cover, brief pause, then lift to reveal
-    const runEntrance = async () => {
-      controls.set({ y: "100%" });
-      await controls.start({
+      // Cover the screen
+      await curtainControls.start({
         y: "0%",
         transition: { duration: 0.5, ease: fluidEase },
       });
-      await controls.start({
+
+      // Bring the title in while the screen is covered
+      await textControls.start({
+        opacity: 1,
+        y: 0,
+        transition: { duration: 0.35, ease: "easeOut", delay: 0.05 },
+      });
+
+      // Hold briefly so the title is readable while the curtain is covering
+      await new Promise((resolve) => setTimeout(resolve, 200));
+
+      // Lift the curtain away
+      await curtainControls.start({
         y: "-100%",
-        transition: { duration: 0.6, ease: [0.83, 0, 0.17, 1], delay: 0.1 },
+        transition: { duration: 0.6, ease: [0.83, 0, 0.17, 1], delay: 0.05 },
+      });
+
+      // Gently fade the title as the curtain clears
+      await textControls.start({
+        opacity: 0,
+        y: -14,
+        transition: { duration: 0.25, ease: "easeInOut" },
       });
     };
 
-    void runEntrance();
-  }, [controls, isPresent, safeToRemove]);
+    const playExit = async () => {
+      // Snap the curtain back to cover, then slide away while removing
+      curtainControls.set({ y: "0%" });
+      textControls.set({ opacity: 1, y: 0 });
+
+      await curtainControls.start({
+        y: "-100%",
+        transition: { duration: 0.55, ease: [0.76, 0, 0.24, 1] },
+      });
+
+      await textControls.start({
+        opacity: 0,
+        y: -12,
+        transition: { duration: 0.2, ease: "easeIn" },
+      });
+
+      safeToRemove();
+    };
+
+    if (isPresent) {
+      void playEntrance();
+    } else {
+      void playExit();
+    }
+  }, [curtainControls, textControls, isPresent, safeToRemove, location.pathname]);
 
   return (
     <motion.div
       aria-hidden
-      className="fixed inset-0 z-50 flex items-center justify-center bg-[#1a1a19] text-[#f7f5f0]"
+      // 3. Flex container to center the text
+      className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--paper-ink)] text-[var(--paper-bg)]"
       initial={{ y: "100%" }}
-      animate={controls}
+      animate={curtainControls}
     >
-      {/* Text Container
-        We use a separate motion div for the text to create a subtle parallax
-        or stagger effect against the curtain movement.
-      */}
+      {/* 4. Text Animation Container */}
       <motion.div
-        initial={{ opacity: 0, y: 32 }}
-        animate={
-          isPresent
-            ? { opacity: 1, y: 0 }
-            : { opacity: 0, y: -24 }
-        }
-        transition={
-          isPresent
-            ? { duration: 0.55, delay: 0.15, ease: "easeOut" }
-            : { duration: 0.25, ease: "easeInOut" }
-        }
         className="flex flex-col items-center gap-2"
+        initial={{ opacity: 0, y: 16 }}
+        animate={textControls}
       >
-        <h1 className="kaito-serif text-4xl font-light tracking-tight md:text-6xl">{title}</h1>
+        <h1 className="kaito-serif text-4xl font-light tracking-tight md:text-6xl">
+          {title}
+        </h1>
 
-        {/* Optional decorative loading bar or subtext */}
+        {/* Optional decorative loading line */}
         <motion.div
-          className="h-[1px] w-12 bg-white/20"
+          className="h-[1px] w-12 bg-[var(--paper-bg)]/30"
           initial={{ width: 0 }}
           animate={{ width: 48 }}
           transition={{ duration: 0.4, delay: 0.3 }}
