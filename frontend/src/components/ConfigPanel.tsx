@@ -69,7 +69,7 @@ export const ConfigPanel = ({
   dataReady = false,
   detectedFreq = null,
 }: ConfigPanelProps) => {
-  const [open, setOpen] = useState(true);
+  const [open, setOpen] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const models = useMemo(
     () => modelOptionsByModule[config.module_type] ?? [],
@@ -113,9 +113,9 @@ export const ConfigPanel = ({
   const canRun = Boolean(onRun) && dataReady && !disabled && !running;
 
   return (
-    <div className="panel sticky top-0 h-screen w-full overflow-y-auto overflow-x-hidden overscroll-contain scrollbar-thin scrollbar-thumb-slate-200 scrollbar-track-transparent">
-      <div className="flex items-center justify-between border-b border-[var(--kaito-border)] bg-[var(--kaito-subtle)] px-5 py-4 text-[var(--kaito-ink)] dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-100">
-        <div className="flex items-center gap-3">
+    <div className="panel sticky top-0 h-screen w-full max-w-full overflow-y-auto overflow-x-hidden overscroll-contain scrollbar-thin scrollbar-thumb-slate-200 scrollbar-track-transparent">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--kaito-border)] bg-[var(--kaito-subtle)] px-5 py-4 text-[var(--kaito-ink)] dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-100">
+        <div className="flex min-w-0 items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-[4px] border border-[var(--kaito-border)] bg-[var(--kaito-surface)] text-[var(--kaito-ink)] shadow-sm dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-100">
             <Settings2 className="h-5 w-5" />
           </div>
@@ -127,7 +127,7 @@ export const ConfigPanel = ({
         <button
           type="button"
           onClick={() => setOpen((prev) => !prev)}
-          className="flex items-center gap-2 rounded-[4px] border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:border-indigo-200 hover:text-indigo-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-indigo-400/60"
+          className="flex items-center gap-2 whitespace-nowrap rounded-[4px] border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:border-indigo-200 hover:text-indigo-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-indigo-400/60"
           aria-expanded={open}
         >
           <ChevronDown className={`h-4 w-4 transition ${open ? "rotate-180" : ""}`} />

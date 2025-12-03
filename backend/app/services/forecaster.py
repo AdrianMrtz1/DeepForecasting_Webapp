@@ -71,11 +71,16 @@ class NixtlaService:
 
         holdout_size = self._determine_test_size(len(df), config_obj)
 
+        # Forecast enough steps to cover the holdout AND the requested horizon so the UI
+        # shows both the test slice and the future horizon on the chart/table.
+        extra_steps = holdout_size if holdout_size > 0 else 0
+        adjusted_horizon = max(1, config_obj.horizon + extra_steps)
+
         # One-step backtesting iterates with horizon=1 to mimic the lecture notebooks.
         run_config = (
             config_obj.model_copy(update={"horizon": 1})
             if config_obj.strategy == Strategy.one_step
-            else config_obj
+            else config_obj.model_copy(update={"horizon": adjusted_horizon})
         )
 
         model_df = self._apply_log_transform(df) if config_obj.log_transform else df.copy()
@@ -84,7 +89,17 @@ class NixtlaService:
         )
 
         if config_obj.strategy == Strategy.one_step and holdout_df is not None:
-            forecast_df, resolved_model = self._one_step_forecast(train_df, holdout_df, run_config)
+            forecast_df, resolved_model, rolling_train = self._one_step_forecast(
+                train_df, holdout_df, run_config
+            )
+            # After stepping through the holdout with actuals, extend the forecast
+            # into the future so the UI sees both the test slice and the user horizon.
+            remaining_horizon = max(adjusted_horizon - len(forecast_df), 0)
+            if remaining_horizon > 0:
+                future_cfg = config_obj.model_copy(update={"horizon": remaining_horizon})
+                future_df, resolved_future, _ = self._run_forecast(rolling_train, future_cfg)
+                forecast_df = pd.concat([forecast_df, future_df], ignore_index=True)
+                resolved_model = resolved_future or resolved_model
             fitted_df = None
         else:
             forecast_df, resolved_model, fitted_df = self._run_forecast(train_df, run_config)
@@ -195,7 +210,7 @@ class NixtlaService:
 
                 run_cfg = cfg.model_copy(update={"horizon": len(holdout_df)})
                 if run_cfg.strategy == Strategy.one_step:
-                    fcst_df, resolved_model = self._one_step_forecast(train_df, holdout_df, run_cfg)
+                    fcst_df, resolved_model, _ = self._one_step_forecast(train_df, holdout_df, run_cfg)
                     fitted_df = None
                 else:
                     fcst_df, resolved_model, fitted_df = self._run_forecast(train_df, run_cfg)
@@ -299,7 +314,7 @@ class NixtlaService:
         train_df: pd.DataFrame,
         holdout_df: pd.DataFrame,
         config: ForecastConfig,
-    ) -> tuple[pd.DataFrame, str]:
+    ) -> tuple[pd.DataFrame, str, pd.DataFrame]:
         """
         Roll forward one-step forecasts using actuals at each step.
 
@@ -350,7 +365,7 @@ class NixtlaService:
                     data[f"{model_column}-hi-{int(lvl)}"] = bounds["upper"]
 
         forecast_df = pd.DataFrame(data)
-        return forecast_df, resolved_model or config.model_type
+        return forecast_df, resolved_model or config.model_type, rolling_train
 
     def _determine_test_size(self, total_rows: int, config: ForecastConfig) -> int:
         """Calculate how many rows to reserve for test metrics based on user fraction."""

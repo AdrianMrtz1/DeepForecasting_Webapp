@@ -14,30 +14,6 @@ React + FastAPI lab: upload a CSV, map \`ds\`/\`y\`, and run StatsForecast, MLFo
 - Backend: FastAPI with StatsForecast, MLForecast, NeuralForecast (Nixtla stack)
 - Data contract: single time-series with \`ds\` (timestamp) and \`y\` (numeric)
 
-## Project Map
-\`\`\`
-DeepForecasting_Webapp
-|-- backend/          FastAPI + Nixtla stack
-|   |-- app/
-|   |   |-- main.py               # API wiring, routes, CORS
-|   |   |-- models.py             # model registry and schemas
-|   |   |-- sample_data.py        # bundled datasets metadata
-|   |   |-- services/             # forecasting + backtesting helpers
-|   |   \`-- utils/                # shared parsing/validation
-|   \`-- tests/                    # pytest suites
-|
-|-- frontend/         Vite + React + Tailwind UI
-|   |-- src/
-|   |   |-- components/           # config panel, charts, upload, tables
-|   |   |-- hooks/                # data fetching and state helpers
-|   |   |-- pages/                # dashboard shell
-|   |   |-- ForecastDashboard.tsx # main experience
-|   |   \`-- index.css             # theme tokens + globals
-|   \`-- public/
-|
-\`-- README.md
-\`\`\`
-
 ## Quickstart
 1. Backend: \`cd backend && python -m venv .venv && ./.venv/Scripts/activate && pip install -r requirements.txt\`
 2. Copy env: \`cp .env.example .env\`, then run \`uvicorn app.main:app --reload --port 9000\`
@@ -116,6 +92,14 @@ const markdownComponents: Components = {
       {children}
     </blockquote>
   ),
+  code: ({ inline, className, children }) =>
+    inline ? (
+      <code className="rounded bg-[var(--kaito-subtle)] px-1 py-0.5 font-mono text-sm">{children}</code>
+    ) : (
+      <pre className="whitespace-pre rounded-md bg-[var(--kaito-subtle)] p-3 font-mono text-sm text-[var(--kaito-ink)]">
+        <code className={className}>{children}</code>
+      </pre>
+    ),
 };
 
 export const Notes = () => {

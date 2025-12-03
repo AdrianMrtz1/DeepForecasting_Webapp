@@ -763,7 +763,13 @@ export const App = () => {
               />
 
               <div id="upload-card">
-                <FileUpload onUpload={uploadFile} loading={loading === "upload"} preview={preview} rows={rows} />
+                <FileUpload
+                  onUpload={uploadFile}
+                  loading={loading === "upload"}
+                  preview={preview}
+                  rows={rows}
+                  dataSource={dataSource}
+                />
               </div>
 
               <ConfigPanel

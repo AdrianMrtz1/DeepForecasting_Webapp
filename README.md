@@ -54,7 +54,7 @@ Backend flow
 - Outputs: timestamps + forecasts + optional confidence intervals; metrics include MAE/RMSE/MAPE on holdout/backtest slices. Leaderboards rank primarily by RMSE.
 
 Evaluation & backtesting
-- Holdout split: fraction of rows (capped to leave >=1 train point) or defaults to `min(horizon, n-1)`. Metrics align lengths; MAPE skips zero actuals.
+- Holdout split: fraction of rows (capped to leave >=1 train point) or defaults to `min(horizon, n-1)`. We forecast the holdout *plus* the requested horizon so charts/tables show both the test slice and the future steps; MAPE skips zero actuals.
 - Backtests: rolling windows from the tail; each window trains on earlier rows and tests the next horizon, advancing by `step_size`. Aggregates average metrics across windows.
 - One-step option mimics iterative real-time evaluation by re-including each actual before predicting the next step.
 

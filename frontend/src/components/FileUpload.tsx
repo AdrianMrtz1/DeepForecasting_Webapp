@@ -9,6 +9,7 @@ interface FileUploadProps {
   loading?: boolean;
   preview?: TimeSeriesRecord[];
   rows?: number;
+  dataSource?: "upload" | "sample" | null;
 }
 
 export const FileUpload = ({
@@ -16,6 +17,7 @@ export const FileUpload = ({
   loading = false,
   preview = [],
   rows = 0,
+  dataSource = null,
 }: FileUploadProps) => {
   const [dragging, setDragging] = useState(false);
   const [file, setFile] = useState<File | null>(null);
@@ -23,13 +25,17 @@ export const FileUpload = ({
   const [dsCol, setDsCol] = useState<string>("");
   const [yCol, setYCol] = useState<string>("");
   const [localError, setLocalError] = useState<string | null>(null);
-  const [open, setOpen] = useState(true);
+  const [open, setOpen] = useState(false);
 
   useEffect(() => {
-    if (file || preview.length) {
+    if (file) {
+      setOpen(true);
+      return;
+    }
+    if (preview.length && dataSource === "upload") {
       setOpen(true);
     }
-  }, [file, preview.length]);
+  }, [dataSource, file, preview.length]);
 
   const normalizeColumns = (cells: string[]) =>
     cells.map((cell, idx) => {

@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 
 import {
   Area,
+  Brush,
   CartesianGrid,
   Line,
   LineChart,
@@ -26,6 +27,8 @@ interface ForecastChartProps {
   loading?: boolean;
   onQuickStart?: () => void;
   quickLabel?: string;
+  lowerBoundKey?: string;
+  upperBoundKey?: string;
 }
 
 type ChartPoint = {
@@ -36,6 +39,11 @@ type ChartPoint = {
 } & Record<string, number | [number, number] | string | undefined>;
 
 const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
+
+const toDateValue = (value: string) => {
+  const t = new Date(value).getTime();
+  return Number.isFinite(t) ? t : Number.NaN;
+};
 
 const hexToRgba = (hex: string, alpha: number) => {
   if (!hex) return `rgba(52, 211, 153, ${alpha})`;
@@ -62,14 +70,6 @@ const formatLabel = (value?: string | number) => {
   return date.toLocaleDateString();
 };
 
-const sortKeys = (keys: string[]) =>
-  keys.sort((a, b) => {
-    const da = new Date(a).getTime();
-    const db = new Date(b).getTime();
-    if (Number.isNaN(da) || Number.isNaN(db)) return a.localeCompare(b);
-    return da - db;
-  });
-
 const FORECAST_COLORS = [
   "#c25b00",
   "#2563eb",
@@ -85,7 +85,7 @@ type ForecastTooltipProps = {
   active?: boolean;
   payload?: ReadonlyArray<{ payload?: ChartPoint }>;
   label?: string | number;
-  intervalLevels: number[];
+  bands: ConfidenceBand[];
 };
 
 type ForecastLine = {
@@ -95,11 +95,18 @@ type ForecastLine = {
   label: string;
 };
 
+type ConfidenceBand = {
+  level: number;
+  lowerKey: string;
+  upperKey: string;
+  rangeKey: string;
+};
+
 const ForecastTooltip = ({
   active,
   payload,
   label,
-  intervalLevels,
+  bands,
   forecastSeries,
 }: ForecastTooltipProps & { forecastSeries: ForecastLine[] }) => {
   if (!active || !payload?.length) return null;
@@ -148,16 +155,16 @@ const ForecastTooltip = ({
             </span>
           </div>
         ))}
-        {intervalLevels.map((lvl) => {
-          const lower = point[`lower_${lvl}`] as number | undefined;
-          const upper = point[`upper_${lvl}`] as number | undefined;
+        {bands.map((band) => {
+          const lower = point[band.lowerKey] as number | undefined;
+          const upper = point[band.upperKey] as number | undefined;
           if (typeof lower !== "number" || typeof upper !== "number") return null;
           return (
             <div
-              key={`tooltip-${lvl}`}
+              key={`tooltip-${band.level}-${band.lowerKey}-${band.upperKey}`}
               className="flex items-center justify-between text-xs text-slate-600 dark:text-slate-400"
             >
-              <span>{lvl}% band</span>
+              <span>{band.level ? `${band.level}% band` : "Band"}</span>
               <span className="font-mono text-slate-900 dark:text-slate-100">
                 {lower.toFixed(3)} - {upper.toFixed(3)}
               </span>
@@ -185,6 +192,8 @@ export const ForecastChart = ({
   loading,
   onQuickStart,
   quickLabel,
+  lowerBoundKey,
+  upperBoundKey,
 }: ForecastChartProps) => {
   const [focusedSeries, setFocusedSeries] = useState<string | null>(null);
   const forecastSeries = useMemo<ForecastLine[]>(() => {
@@ -202,26 +211,71 @@ export const ForecastChart = ({
   const primarySeries = forecastSeries[forecastSeries.length - 1] ?? null;
   const primaryForecast = primarySeries?.run ?? null;
   const primaryDataKey = primarySeries?.dataKey ?? "forecast_primary";
+  const focusedForecastSeries =
+    focusedSeries !== null
+      ? forecastSeries.find((series) => series.dataKey === focusedSeries) ?? null
+      : null;
+  const latestStatsForecastSeries =
+    forecastSeries
+      .slice()
+      .reverse()
+      .find(
+        (series) =>
+          series.run.config.module_type === "StatsForecast" &&
+          (series.run.bounds?.length ?? 0) > 0,
+      ) ?? null;
+  const bandSourceSeries =
+    focusedForecastSeries &&
+    focusedForecastSeries.run.config.module_type === "StatsForecast" &&
+    (focusedForecastSeries.run.bounds?.length ?? 0) > 0
+      ? focusedForecastSeries
+      : latestStatsForecastSeries;
+  const bandForecast = bandSourceSeries?.run ?? null;
   const primaryStroke = primarySeries?.color ?? _accentColor ?? "#c25b00";
+  const confidenceAvailable =
+    bandForecast?.config.module_type === "StatsForecast" &&
+    (bandForecast.bounds?.length ?? 0) > 0;
+  const showBands = Boolean(confidenceAvailable && bandSourceSeries);
   const intervalLevels = useMemo(
-    () => primaryForecast?.bounds?.map((b) => b.level)?.sort((a, b) => a - b) ?? [],
-    [primaryForecast],
+    () => bandForecast?.bounds?.map((b) => b.level)?.sort((a, b) => a - b) ?? [],
+    [bandForecast],
   );
+  const bandDescriptors = useMemo<ConfidenceBand[]>(() => {
+    if (!showBands || !bandForecast) return [];
+    if (lowerBoundKey && upperBoundKey) {
+      const baseLevel = intervalLevels[intervalLevels.length - 1] ?? intervalLevels[0] ?? 0;
+      return [
+        {
+          level: baseLevel,
+          lowerKey: lowerBoundKey,
+          upperKey: upperBoundKey,
+          rangeKey: `${lowerBoundKey}__${upperBoundKey}__range`,
+        },
+      ];
+    }
+    return intervalLevels.map((lvl) => ({
+      level: lvl,
+      lowerKey: `lower_${lvl}`,
+      upperKey: `upper_${lvl}`,
+      rangeKey: `range_${lvl}`,
+    }));
+  }, [bandForecast, intervalLevels, lowerBoundKey, showBands, upperBoundKey]);
+  const bandLevels = bandDescriptors.length ? bandDescriptors.map((band) => band.level) : intervalLevels;
   const boundsMap = useMemo(() => {
     const map = new Map<number, { lower: number[]; upper: number[] }>();
-    primaryForecast?.bounds?.forEach((interval) =>
+    bandForecast?.bounds?.forEach((interval) =>
       map.set(interval.level, { lower: interval.lower, upper: interval.upper }),
     );
     return map;
-  }, [primaryForecast]);
+  }, [bandForecast]);
   const bandOpacityByLevel = useMemo(() => {
-    if (!intervalLevels.length) return new Map<number, number>();
-    const spreads = intervalLevels.map((lvl) => {
-      const bounds = boundsMap.get(lvl);
-      if (!bounds) return { lvl, spread: 0.1 };
+    if (!bandDescriptors.length) return new Map<number, number>();
+    const spreads = bandDescriptors.map((band) => {
+      const bounds = boundsMap.get(band.level);
+      if (!bounds) return { lvl: band.level, spread: 0.1 };
       const widths = bounds.upper.map((value, idx) => Math.abs(value - bounds.lower[idx]));
       const spread = widths.length ? widths.reduce((sum, v) => sum + v, 0) / widths.length : 0.1;
-      return { lvl, spread };
+      return { lvl: band.level, spread };
     });
     const maxSpread = spreads.reduce((max, item) => Math.max(max, item.spread), 0.1);
     const mapped = new Map<number, number>();
@@ -231,7 +285,7 @@ export const ForecastChart = ({
       mapped.set(lvl, Number(opacity.toFixed(3)));
     });
     return mapped;
-  }, [boundsMap, intervalLevels]);
+  }, [bandDescriptors, boundsMap]);
   const moduleBadge = primaryForecast
     ? `${primaryForecast.config.module_type} / ${primaryForecast.config.model_type.toUpperCase()}`
     : "Awaiting run";
@@ -254,73 +308,104 @@ export const ForecastChart = ({
   }, [primaryForecast?.fitted]);
 
   const data = useMemo<ChartPoint[]>(() => {
-    const points = new Map<string, ChartPoint>();
-
-    const ensurePoint = (ds: string) => {
-      if (!points.has(ds)) {
-        points.set(ds, { ds });
+    const trainCount = history.length - testSet.length;
+    const timestampsOrder: string[] = [];
+    const pushTs = (ts: string) => {
+      if (!timestampsOrder.includes(ts)) {
+        timestampsOrder.push(ts);
       }
-      return points.get(ds)!;
     };
 
-    const testCount = testSet.length;
-    const splitIndex = Math.max(history.length - testCount, 0);
-    const training = testCount ? history.slice(0, splitIndex) : history;
-    const holdout = testCount ? history.slice(splitIndex) : [];
+    history.forEach((row) => pushTs(row.ds));
+    forecastSeries.forEach((series) => series.run.timestamps.forEach((ts) => pushTs(ts)));
+    fittedMap.forEach((_, ts) => pushTs(ts));
 
-    training.forEach((row) => {
-      const point = ensurePoint(row.ds);
-      point.actual = row.y;
+    const sortedTimestamps = [...timestampsOrder].sort((a, b) => {
+      const da = toDateValue(a);
+      const db = toDateValue(b);
+      if (Number.isFinite(da) && Number.isFinite(db)) return da - db;
+      return timestampsOrder.indexOf(a) - timestampsOrder.indexOf(b);
     });
 
-    holdout.forEach((row) => {
-      const point = ensurePoint(row.ds);
-      point.testActual = row.y;
+    const actualMap = new Map<string, number>();
+    const testActualMap = new Map<string, number>();
+    history.forEach((row, idx) => {
+      if (idx < trainCount) {
+        actualMap.set(row.ds, row.y);
+      } else {
+        testActualMap.set(row.ds, row.y);
+      }
     });
 
-    fittedMap.forEach((value, ts) => {
-      const point = ensurePoint(ts);
-      point.trainPrediction = value;
-    });
-
+    const forecastMaps = new Map<string, Map<string, number>>();
     forecastSeries.forEach((series) => {
+      const map = new Map<string, number>();
       series.run.timestamps.forEach((ts, idx) => {
-        const point = ensurePoint(ts);
-        point[series.dataKey] = series.run.forecast[idx];
+        const value = series.run.forecast[idx];
+        map.set(ts, value);
       });
+      forecastMaps.set(series.dataKey, map);
     });
 
-    if (primaryForecast) {
-      primaryForecast.timestamps.forEach((ts, idx) => {
-        const point = ensurePoint(ts);
-        intervalLevels.forEach((lvl) => {
-          const bounds = boundsMap.get(lvl);
-          if (bounds) {
-            point[`lower_${lvl}`] = bounds.lower[idx];
-            point[`upper_${lvl}`] = bounds.upper[idx];
-            point[`range_${lvl}`] = [bounds.lower[idx], bounds.upper[idx]];
-          }
-        });
-      });
-    }
+    return sortedTimestamps.map((ts) => {
+      const point: ChartPoint = { ds: ts };
+      if (actualMap.has(ts)) point.actual = actualMap.get(ts);
+      if (testActualMap.has(ts)) point.testActual = testActualMap.get(ts);
+      if (fittedMap.has(ts)) point.trainPrediction = fittedMap.get(ts);
 
-    const ordered = sortKeys(Array.from(points.keys()));
-    return ordered.map((key) => points.get(key)!);
-  }, [boundsMap, forecastSeries, fittedMap, history, intervalLevels, primaryForecast, testSet]);
+      forecastMaps.forEach((map, key) => {
+        const value = map.get(ts);
+        if (value !== undefined) point[key] = value;
+      });
+
+      if (bandForecast && bandDescriptors.length) {
+        const tsIdx = bandForecast.timestamps.findIndex((t) => t === ts);
+        if (tsIdx >= 0) {
+          bandDescriptors.forEach((band) => {
+            const bounds = boundsMap.get(band.level);
+            if (bounds) {
+              const lower = bounds.lower[tsIdx];
+              const upper = bounds.upper[tsIdx];
+              point[band.lowerKey] = lower;
+              point[band.upperKey] = upper;
+              point[band.rangeKey] = [lower, upper];
+            }
+          });
+        }
+      }
+
+      return point;
+    });
+  }, [
+    bandDescriptors,
+    bandForecast,
+    boundsMap,
+    forecastSeries,
+    fittedMap,
+    history,
+    testSet,
+  ]);
 
   const isDimmed = (key: string) => focusedSeries !== null && focusedSeries !== key;
   const colorSet = useMemo(() => {
     const trainStroke = "#222";
     const testStroke = warmColor ?? _secondaryColor ?? "#524b41";
     const fitStroke = "#8c7968";
-    const bandFill = hexToRgba(primaryStroke, 0.1);
+    const bandBase =
+      bandSourceSeries?.color ?? focusedForecastSeries?.color ?? primaryStroke ?? "#c25b00";
+    const bandFills = [
+      hexToRgba(bandBase, 0.26),
+      hexToRgba(bandBase, 0.18),
+      hexToRgba(bandBase, 0.12),
+    ];
     return {
       train: trainStroke,
       test: testStroke,
       fit: fitStroke,
-      bandFills: [bandFill, hexToRgba(primaryStroke, 0.07), hexToRgba(primaryStroke, 0.05)],
+      bandOutline: bandBase,
+      bandFills,
     };
-  }, [primaryStroke, warmColor, _secondaryColor]);
+  }, [bandSourceSeries?.color, focusedForecastSeries?.color, primaryStroke, warmColor, _secondaryColor]);
 
   const strokeFor = (key: string, color: string) => (isDimmed(key) ? "#7d7368" : color);
   const opacityFor = (key: string) => (isDimmed(key) ? 0.35 : 1);
@@ -364,6 +449,11 @@ export const ForecastChart = ({
           {primaryForecast?.config.log_transform && (
             <span className="pill border-slate-300 bg-slate-100 text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100">
               log1p
+            </span>
+          )}
+          {bandLevels.length > 0 && (
+            <span className="pill border-amber-300 bg-amber-50 text-amber-700 shadow-sm shadow-amber-500/10 dark:border-amber-400/60 dark:bg-amber-500/10 dark:text-amber-100">
+              Bands: {bandLevels.join("% / ")}% (focus to show)
             </span>
           )}
         </div>
@@ -412,6 +502,9 @@ export const ForecastChart = ({
           );
         })}
       </div>
+      <p className="mt-1 text-[11px] text-[#6a655b] dark:text-slate-400">
+        Click a forecast to focus and reveal bold confidence bands; drag the mini-map below to zoom the timeline.
+      </p>
 
       <div className="mt-3 flex flex-wrap items-center gap-4 text-xs text-slate-700 dark:text-slate-200">
         {[
@@ -487,13 +580,15 @@ export const ForecastChart = ({
                 tickFormatter={formatLabel}
                 tick={{ fill: "#5c564d", fontSize: 11 }}
                 height={40}
+                allowDuplicatedCategory={false}
+                type="category"
               />
               <YAxis tick={{ fill: "#5c564d", fontSize: 11 }} />
               <Tooltip
                 labelFormatter={formatLabel}
                 content={(props) => (
                   <ForecastTooltip
-                    intervalLevels={intervalLevels}
+                    bands={showBands ? bandDescriptors : []}
                     forecastSeries={forecastSeries}
                     {...props}
                   />
@@ -510,22 +605,36 @@ export const ForecastChart = ({
                   animationDuration={1400}
                 />
               ) : null}
-              {intervalLevels.map((lvl, idx) => (
-                <Area
-                  key={`band-${lvl}`}
-                  type="monotone"
-                  dataKey={`range_${lvl}`}
-                  isRange
-                  stroke="none"
-                  fill={colorSet.bandFills[idx % colorSet.bandFills.length]}
-                  fillOpacity={
-                    isDimmed(primaryDataKey) ? 0.18 : bandOpacityByLevel.get(lvl) ?? 0.32
-                  }
-                  isAnimationActive={!loading}
-                  animationDuration={1000 + idx * 120}
-                  legendType="none"
-                />
-              ))}
+              {showBands
+                ? bandDescriptors.map((band, idx) => {
+                    const baseOpacity = bandOpacityByLevel.get(band.level) ?? 0.3;
+                    const boostedOpacity = Math.min(0.35, Math.max(0.22, baseOpacity));
+                    return (
+                      <Area
+                        key={`band-${band.level}-${band.rangeKey}`}
+                        type="monotone"
+                        dataKey={band.rangeKey}
+                        isRange
+                        stroke={colorSet.bandOutline}
+                        strokeOpacity={1}
+                        strokeWidth={3.2}
+                        fill={colorSet.bandFills[idx % colorSet.bandFills.length]}
+                        fillOpacity={boostedOpacity}
+                        isAnimationActive={!loading}
+                        animationDuration={1000 + idx * 120}
+                        legendType="none"
+                      />
+                    );
+                  })
+                : null}
+              <Brush
+                dataKey="ds"
+                height={24}
+                stroke="#c25b00"
+                travellerWidth={10}
+                tickFormatter={formatLabel}
+                fill="rgba(194,91,0,0.08)"
+              />
               <Line
                 type="monotone"
                 dataKey="actual"
@@ -578,6 +687,7 @@ export const ForecastChart = ({
                   isAnimationActive={!loading}
                   animationDuration={1400 + idx * 80}
                   strokeLinecap="round"
+                  connectNulls
                 />
               ))}
             </LineChart>
