@@ -33,3 +33,7 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Local app artifacts
+backend/config_store.json
+backend/lightning_logs/
