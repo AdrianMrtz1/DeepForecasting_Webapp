@@ -129,7 +129,7 @@ export const ConfigPanel = ({
   const canRun = Boolean(onRun) && dataReady && !disabled && !running;
 
   return (
-    <div className="panel sticky top-0 h-screen w-full max-w-full overflow-y-auto overflow-x-hidden overscroll-contain scrollbar-thin scrollbar-thumb-slate-200 scrollbar-track-transparent">
+    <div className="panel relative w-full max-w-full overscroll-contain scrollbar-thin scrollbar-thumb-slate-200 scrollbar-track-transparent">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--kaito-border)] bg-[var(--kaito-subtle)] px-5 py-4 text-[var(--kaito-ink)] dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-100">
         <div className="flex min-w-0 items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-[4px] border border-[var(--kaito-border)] bg-[var(--kaito-surface)] text-[var(--kaito-ink)] shadow-sm dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-100">
@@ -632,7 +632,7 @@ export const ConfigPanel = ({
             </div>
           ) : null}
 
-        <div className="rounded-[4px] border border-[var(--kaito-border)] bg-[var(--kaito-surface)] px-4 py-3 text-sm text-[var(--kaito-ink)] shadow-sm dark:border-slate-800 dark:bg-slate-900/70 dark:text-slate-100">
+        <div className="sticky bottom-0 z-10 -mx-6 -mb-6 mt-4 border-t border-[var(--kaito-border)] bg-[var(--kaito-surface)] p-4 text-sm text-[var(--kaito-ink)] dark:border-slate-800 dark:bg-slate-900/70">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <p className="font-semibold">Run forecast</p>

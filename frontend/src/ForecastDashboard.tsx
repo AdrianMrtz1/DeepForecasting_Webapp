@@ -731,13 +731,13 @@ export const App = () => {
 
   return (
     <div className={isDark ? "dark" : ""}>
-      <PageWrapper className="kaito-shell relative flex min-h-screen flex-col items-stretch bg-[var(--kaito-bg)] text-[var(--kaito-ink)] transition-colors duration-500 dark:bg-slate-950 dark:text-slate-200 lg:flex-row">
+      <PageWrapper className="kaito-shell relative flex h-screen flex-col items-stretch overflow-hidden overflow-y-auto bg-[var(--kaito-bg)] text-[var(--kaito-ink)] transition-colors duration-500 dark:bg-slate-950 dark:text-slate-200 lg:flex-row lg:overflow-hidden">
         <motion.aside
           layout
           variants={itemVariants}
           custom={0}
           transition={{ layout: { duration: 0.6, ease: fluidEase } }}
-          className="w-full shrink-0 overflow-y-auto border-b border-[var(--kaito-border)] bg-[var(--kaito-subtle)] px-5 py-6 shadow-[0_10px_24px_rgba(0,0,0,0.04)] no-scrollbar min-h-screen lg:min-h-screen lg:w-80 lg:min-w-[320px] lg:flex-shrink-0 lg:border-b-0 lg:border-r lg:shadow-[12px_0_30px_rgba(0,0,0,0.04)] dark:border-slate-800 dark:bg-slate-900/40"
+          className="w-full h-screen flex-shrink-0 overflow-y-auto border-b border-[var(--kaito-border)] bg-[var(--kaito-subtle)] px-5 py-6 shadow-[0_10px_24px_rgba(0,0,0,0.04)] no-scrollbar lg:h-full lg:w-80 lg:min-w-[320px] lg:flex-shrink-0 lg:border-b-0 lg:border-r lg:shadow-[12px_0_30px_rgba(0,0,0,0.04)] dark:border-slate-800 dark:bg-slate-900/40"
         >
             <Link to="/" className="group flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#1f1c19] font-semibold text-white shadow-sm shadow-black/20 transition group-hover:translate-y-[-2px] group-hover:shadow-lg">
@@ -798,7 +798,7 @@ export const App = () => {
           variants={itemVariants}
           custom={0.12}
           transition={{ layout: { duration: 0.6, ease: fluidEase } }}
-          className="flex min-w-0 flex-1 flex-col"
+          className="flex min-w-0 flex-1 flex-col h-full min-h-0 overflow-hidden"
         >
           <motion.header
             layout
@@ -833,7 +833,7 @@ export const App = () => {
             </div>
           </motion.header>
 
-          <motion.div className="flex-1 overflow-y-auto" layout>
+          <motion.div className="flex-1 overflow-y-auto min-h-0" layout>
             <div className="content-boundary py-8 lg:py-12">
               <motion.div className="dashboard-shell" variants={containerVariants}>
                 {error && (
