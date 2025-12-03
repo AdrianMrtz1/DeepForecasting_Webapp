@@ -7,12 +7,36 @@ import { PageWrapper, itemVariants } from "../components/PageWrapper";
 const noteMarkdown = `
 # Deep Forecasting Web App
 
-React + FastAPI implementation of the Nixtla project: upload a CSV, pick target/date columns, run econometric/ML/neural models, benchmark them with rolling backtests, and compare results in a single UI.
+React + FastAPI lab: upload a CSV, map \`ds\`/\`y\`, and run StatsForecast, MLForecast, or NeuralForecast models with benchmarks, rolling backtests, and confidence bands.
 
 ## Stack
-- Frontend: Vite + React + Tailwind (lab-style layout, benchmark/backtest controls, config persistence)
-- Backend: FastAPI with StatsForecast, MLForecast, NeuralForecast
+- Frontend: Vite + React + Tailwind (Dashboard, ConfigPanel, charts/tables, presets, saved configs)
+- Backend: FastAPI with StatsForecast, MLForecast, NeuralForecast (Nixtla stack)
 - Data contract: single time-series with \`ds\` (timestamp) and \`y\` (numeric)
+
+## Project Map
+\`\`\`
+DeepForecasting_Webapp
+|-- backend/          FastAPI + Nixtla stack
+|   |-- app/
+|   |   |-- main.py               # API wiring, routes, CORS
+|   |   |-- models.py             # model registry and schemas
+|   |   |-- sample_data.py        # bundled datasets metadata
+|   |   |-- services/             # forecasting + backtesting helpers
+|   |   `-- utils/                # shared parsing/validation
+|   `-- tests/                    # pytest suites
+|
+|-- frontend/         Vite + React + Tailwind UI
+|   |-- src/
+|   |   |-- components/           # config panel, charts, upload, tables
+|   |   |-- hooks/                # data fetching and state helpers
+|   |   |-- pages/                # dashboard shell
+|   |   |-- ForecastDashboard.tsx # main experience
+|   |   `-- index.css             # theme tokens + globals
+|   `-- public/
+|
+\`-- README.md
+\`\`\`
 
 ## Quickstart
 1. Backend: \`cd backend && python -m venv .venv && ./.venv/Scripts/activate && pip install -r requirements.txt\`
@@ -20,27 +44,55 @@ React + FastAPI implementation of the Nixtla project: upload a CSV, pick target/
 3. Frontend: \`cd frontend && npm install && npm run dev\` (expects API at http://localhost:9000 or set \`VITE_API_BASE_URL\`)
 
 ## Features
-- Model breadth: StatsForecast (AutoARIMA/AutoETS/Naive/etc.), MLForecast (LightGBM/XGBoost/CatBoost/RandomForest/Linear), NeuralForecast (MLP/RNN/LSTM/GRU)
-- Benchmarking: batch endpoint runs multiple configs and returns a leaderboard
-- Rolling backtests: configurable windows/step with aggregate metrics per model
-- Preprocessing: date filters, missing-value strategies, log transform, holdout splits
-- Frequency handling: automatic cadence detection with manual override
-- Config persistence: save/reload named configurations on disk
-- Sample data: bundled series with recommended settings
+- Model breadth: StatsForecast (AutoARIMA/AutoETS/naive), MLForecast (LightGBM/XGBoost/CatBoost/RandomForest/Linear), NeuralForecast (MLP/RNN/LSTM/GRU)
+- Benchmarking: \`/forecast/batch\` runs multiple configs and returns a leaderboard
+- Rolling backtests: \`/backtest\` with window/step controls and per-window + aggregate metrics
+- Preprocessing: date filters, missing-value strategies, log transform, holdout splits, cadence detection/override
+- Config persistence: save/reload named configurations; bundled sample datasets with suggested defaults
+
+## Walkthrough
+### Architecture
+- FastAPI backend (\`backend/app/main.py\`) with service layer (\`backend/app/services/forecaster.py\`) and Pydantic schemas (\`backend/app/models.py\`).
+- React/Vite frontend; main experience in \`frontend/src/ForecastDashboard.tsx\`, state/data in \`frontend/src/hooks/useForecast.ts\`, UI controls/charts in \`frontend/src/components/*\`.
+
+### Backend flow
+- \`/upload\` validates/cleans CSVs (\`validate_timeseries_payload\`), infers frequency, stores df keyed by \`upload_id\`.
+- \`/forecast\` single run; \`/forecast/batch\` benchmarks multiple configs; \`/backtest\` rolling windows; \`/configs\` save/retrieve; \`/datasets\` serves bundled samples.
+- \`NixtlaService\` prepares data (sorts, date filters, missing strategy, optional log1p), optional freq detect, holdout sizing from \`test_size_fraction\` or horizon.
+- Strategies: \`one_step\` retrains each step; \`multi_step_recursive\` uses one model for full horizon; \`multi_output_direct\` only for ML/Neural.
+- Models: StatsForecast (ARIMA/ETS/naive/window averages), MLForecast (linear/tree/boosting with lags), NeuralForecast (MLP/RNN/LSTM/GRU with ray stub fallback). Defaults favor quick, safe runs (season_length-driven ARIMA/ETS, lags [1,7,season], small neural sizes).
+- Outputs: timestamps + forecasts + optional confidence intervals; metrics MAE/RMSE/MAPE. Leaderboards rank by RMSE then MAE.
+
+### Evaluation & backtesting
+- Holdout split: fraction of rows (capped to leave ≥1 train point) or \`min(horizon, n-1)\`; metrics align lengths; MAPE skips zero actuals.
+- Backtests: rolling windows from the tail, training on past rows and testing the next horizon; advance by \`step_size\`; averages metrics across windows.
+- One-step mirrors iterative real-time: re-include each actual before predicting the next step.
+
+### Frontend flow
+- \`useForecast.ts\` holds config, upload/sample data, run history, benchmarks, backtests, saved configs, and API calls; sanitizes configs to keep module/model/strategy valid.
+- \`ConfigPanel.tsx\`: module/model pickers, horizon/freq/season length, test split slider, missing strategy, date filters, strategy toggle, log transform, confidence levels (StatsForecast), lags (MLForecast), neural hyperparams.
+- \`FileUpload.tsx\`: reads CSV headers, guesses \`ds\`/\`y\`, maps to \`/upload\`, shows preview; \`SampleDatasetPicker.tsx\` pulls \`/datasets\` and applies recommended defaults.
+- \`ForecastDashboard.tsx\`: KPIs, chart, table, benchmark/backtest controls, leaderboard tabs, CSV export; \`useRunForecast\` wraps runs with toasts; theme/tokens in \`src/index.css\`.
+
+### Typical user workflow
+- Upload CSV or pick a sample → backend validates + infers freq → UI sets preview/history and suggested config.
+- Adjust config (module/model, horizon, freq/seasonality, missing handling, test split, log transform, strategy, hyperparams).
+- Run a single forecast (metrics + bounds + fitted optional) and optionally export CSV.
+- Benchmark multiple presets via \`/forecast/batch\`; get ranked leaderboard.
+- Run rolling backtests to view window-by-window and aggregate metrics.
+- Save/load configs via \`/configs\` to reuse setups.
 
 ## Key Endpoints
-- POST /upload: stream CSV upload, validate/remap columns, return preview + detected frequency
-- POST /forecast: single-model forecast with metrics/intervals and optional fitted values
-- POST /forecast/batch: run multiple configs on the same dataset; returns forecasts + leaderboard
-- POST /backtest: rolling windows backtest across configs; per-window + aggregate metrics
-- GET/POST /configs: list/save reusable configurations
-- GET /datasets, GET /datasets/{id}: sample metadata and full records
+- \`POST /upload\`: stream CSV upload, validate/remap columns, return preview + detected frequency
+- \`POST /forecast\`: single-model forecast with metrics/intervals and optional fitted values
+- \`POST /forecast/batch\`: run multiple configs on the same dataset; returns forecasts + leaderboard
+- \`POST /backtest\`: rolling windows backtest across configs; per-window + aggregate metrics
+- \`GET/POST /configs\`: list/save reusable configurations
+- \`GET /datasets\`, \`GET /datasets/{id}\`: sample metadata and full records
 
 ## Testing and Quality
-- Backend: pytest, ruff, black, isort
-- Frontend: npm run test (Vitest), npm run lint (ESLint + Prettier)
-
-> Fast path: drop a CSV, map ds/y, toggle preset model sets, run forecast or benchmark, and read the chart + leaderboard side by side.
+- Backend: \`pytest\`, \`ruff\`, \`black\`, \`isort\`
+- Frontend: \`npm run test\` (Vitest), \`npm run lint\` (ESLint + Prettier)
 `;
 
 const notesCatalog = [
