@@ -1,37 +1,46 @@
-import { cubicBezier, motion, type Variants } from "framer-motion";
+import { motion, type Variants } from "framer-motion";
 import type { ReactNode } from "react";
 
-const calmEase = cubicBezier(0.6, 0.01, -0.05, 0.9);
+// Snappy start, slow settle to mimic editorial scroll sites
+export const fluidEase = [0.25, 1, 0.5, 1] as const;
 
 export const containerVariants: Variants = {
   hidden: { opacity: 0 },
   show: {
     opacity: 1,
     transition: {
-      ease: calmEase,
-      duration: 0.8,
-      delayChildren: 0.08,
-      staggerChildren: 0.14,
-      when: "beforeChildren",
+      staggerChildren: 0.12,
+      delayChildren: 0.1,
+      ease: fluidEase,
     },
   },
   exit: {
     opacity: 0,
-    transition: { duration: 0.45, ease: calmEase },
+    transition: { duration: 0.4, ease: fluidEase },
   },
 };
 
 export const itemVariants: Variants = {
-  hidden: { opacity: 0, y: 20 },
-  show: {
+  hidden: {
+    opacity: 0,
+    y: 40,
+    filter: "blur(4px)",
+  },
+  show: (custom = 0) => ({
     opacity: 1,
     y: 0,
-    transition: { duration: 0.6, ease: calmEase },
-  },
+    filter: "blur(0px)",
+    transition: {
+      duration: 1.1,
+      ease: fluidEase,
+      delay: custom,
+    },
+  }),
   exit: {
     opacity: 0,
-    y: -12,
-    transition: { duration: 0.4, ease: calmEase },
+    y: 12,
+    filter: "blur(6px)",
+    transition: { duration: 0.45, ease: fluidEase },
   },
 };
 

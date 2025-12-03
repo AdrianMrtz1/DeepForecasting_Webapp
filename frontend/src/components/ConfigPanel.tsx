@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { motion } from "framer-motion";
 
 import { ChevronDown, Loader2, Play, Settings2, SlidersHorizontal } from "lucide-react";
 
@@ -59,6 +60,21 @@ interface ConfigPanelProps {
   dataReady?: boolean;
   detectedFreq?: string | null;
 }
+
+const animationContainer = {
+  hidden: { opacity: 0 },
+  show: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.1,
+    },
+  },
+};
+
+const animationItem = {
+  hidden: { opacity: 0, y: 20 },
+  show: { opacity: 1, y: 0 },
+};
 
 export const ConfigPanel = ({
   config,

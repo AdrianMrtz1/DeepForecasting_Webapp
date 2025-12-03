@@ -16,9 +16,10 @@ import { ConfigPanel } from "./components/ConfigPanel";
 import { FileUpload } from "./components/FileUpload";
 import { ForecastChart } from "./components/ForecastChart";
 import { ForecastDataTable } from "./components/ForecastDataTable";
-import { PageWrapper, itemVariants } from "./components/PageWrapper";
+import { PageWrapper, containerVariants, fluidEase, itemVariants } from "./components/PageWrapper";
 import { SampleDatasetPicker } from "./components/SampleDatasetPicker";
 import { TopKpiRow } from "./components/TopKpiRow";
+import { RevealText } from "./components/ui/Reveal";
 import { useForecast } from "./hooks/useForecast";
 import { useRunForecast } from "./hooks/useRunForecast";
 import type { ForecastConfigState, ForecastRun } from "./types";
@@ -726,14 +727,18 @@ export const App = () => {
 
 
 
+  const hoverSpring = { type: "spring", stiffness: 400, damping: 17 };
+
   return (
     <div className={isDark ? "dark" : ""}>
-      <PageWrapper className="kaito-shell relative min-h-screen bg-[var(--kaito-bg)] text-[var(--kaito-ink)] transition-colors duration-500 dark:bg-slate-950 dark:text-slate-200">
-        <div className="flex min-h-screen flex-col items-stretch lg:flex-row">
-          <motion.aside
-            variants={itemVariants}
-            className="w-full shrink-0 overflow-y-auto border-b border-[var(--kaito-border)] bg-[var(--kaito-subtle)] px-5 py-6 shadow-[0_10px_24px_rgba(0,0,0,0.04)] no-scrollbar min-h-screen lg:min-h-screen lg:w-80 lg:min-w-[320px] lg:flex-shrink-0 lg:border-b-0 lg:border-r lg:shadow-[12px_0_30px_rgba(0,0,0,0.04)] dark:border-slate-800 dark:bg-slate-900/40"
-          >
+      <PageWrapper className="kaito-shell relative flex min-h-screen flex-col items-stretch bg-[var(--kaito-bg)] text-[var(--kaito-ink)] transition-colors duration-500 dark:bg-slate-950 dark:text-slate-200 lg:flex-row">
+        <motion.aside
+          layout
+          variants={itemVariants}
+          custom={0}
+          transition={{ layout: { duration: 0.6, ease: fluidEase } }}
+          className="w-full shrink-0 overflow-y-auto border-b border-[var(--kaito-border)] bg-[var(--kaito-subtle)] px-5 py-6 shadow-[0_10px_24px_rgba(0,0,0,0.04)] no-scrollbar min-h-screen lg:min-h-screen lg:w-80 lg:min-w-[320px] lg:flex-shrink-0 lg:border-b-0 lg:border-r lg:shadow-[12px_0_30px_rgba(0,0,0,0.04)] dark:border-slate-800 dark:bg-slate-900/40"
+        >
             <Link to="/" className="group flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#1f1c19] font-semibold text-white shadow-sm shadow-black/20 transition group-hover:translate-y-[-2px] group-hover:shadow-lg">
                 DC
@@ -746,7 +751,7 @@ export const App = () => {
               </div>
             </Link>
 
-            <div className="mt-6 space-y-4 pb-4">
+            <motion.div className="mt-6 space-y-4 pb-4" variants={containerVariants} layout>
               <div className="panel-subtle p-4">
                 <p className="card-title">Forecast setup</p>
                 <p className="text-sm text-[var(--kaito-muted)] dark:text-slate-300">
@@ -754,15 +759,17 @@ export const App = () => {
                 </p>
               </div>
 
-              <SampleDatasetPicker
-                datasets={datasets}
-                activeId={selectedDataset?.id ?? null}
-                loadingId={sampleLoading}
-                error={datasetsError}
-                onSelect={loadSampleDataset}
-              />
+              <motion.div variants={itemVariants} layout>
+                <SampleDatasetPicker
+                  datasets={datasets}
+                  activeId={selectedDataset?.id ?? null}
+                  loadingId={sampleLoading}
+                  error={datasetsError}
+                  onSelect={loadSampleDataset}
+                />
+              </motion.div>
 
-              <div id="upload-card">
+              <motion.div id="upload-card" variants={itemVariants} layout>
                 <FileUpload
                   onUpload={uploadFile}
                   loading={loading === "upload"}
@@ -770,68 +777,82 @@ export const App = () => {
                   rows={rows}
                   dataSource={dataSource}
                 />
-              </div>
+              </motion.div>
 
-              <ConfigPanel
-                config={config}
-                onChange={updateConfig}
-                onRun={() => triggerForecast(undefined)}
-                running={loading === "forecast" || isRunPending}
-                dataReady={hasDataLoaded}
-                detectedFreq={detectedFreq ?? selectedDataset?.freq ?? null}
-                disabled={loading === "upload" || isRunPending}
-              />
-            </div>
+              <motion.div variants={itemVariants} layout custom={0.06}>
+                <ConfigPanel
+                  config={config}
+                  onChange={updateConfig}
+                  onRun={() => triggerForecast(undefined)}
+                  running={loading === "forecast" || isRunPending}
+                  dataReady={hasDataLoaded}
+                  detectedFreq={detectedFreq ?? selectedDataset?.freq ?? null}
+                  disabled={loading === "upload" || isRunPending}
+                />
+              </motion.div>
+            </motion.div>
           </motion.aside>
 
-          <motion.main variants={itemVariants} className="flex min-w-0 flex-1 flex-col">
-            <header className="sticky top-0 z-20 flex h-16 items-center justify-between border-b border-[var(--kaito-border)] bg-[var(--kaito-surface)] px-6 shadow-[0_10px_26px_rgba(0,0,0,0.06)] dark:border-slate-800 dark:bg-slate-950/70">
-              <div className="flex items-center gap-3">
-                <BrainCircuit className="h-5 w-5 text-[var(--kaito-muted)]" />
-                <div>
-                  <p className="kaito-serif text-xl font-semibold tracking-[-0.02em] text-slate-900 dark:text-slate-100">
-                    DeepCast Workbench
-                  </p>
-                  <p className="kaito-meta text-[var(--kaito-muted)]">Warm utility workspace for forecasts</p>
-                </div>
+        <motion.main
+          layout
+          variants={itemVariants}
+          custom={0.12}
+          transition={{ layout: { duration: 0.6, ease: fluidEase } }}
+          className="flex min-w-0 flex-1 flex-col"
+        >
+          <motion.header
+            layout
+            variants={itemVariants}
+            custom={0.18}
+            className="sticky top-0 z-20 flex h-16 items-center justify-between border-b border-[var(--kaito-border)] bg-[var(--kaito-surface)] px-6 shadow-[0_10px_26px_rgba(0,0,0,0.06)] dark:border-slate-800 dark:bg-slate-950/70"
+          >
+            <div className="flex items-center gap-3">
+              <BrainCircuit className="h-5 w-5 text-[var(--kaito-muted)]" />
+              <div>
+                <RevealText
+                  as="p"
+                  delay={0.08}
+                  className="kaito-serif text-xl font-semibold tracking-[-0.02em] text-slate-900 dark:text-slate-100"
+                >
+                  DeepCast Workbench
+                </RevealText>
+                <p className="kaito-meta text-[var(--kaito-muted)]">Warm utility workspace for forecasts</p>
               </div>
-              <div className="flex items-center gap-3">
-                <span className="rounded-full border border-[var(--kaito-border)] bg-[var(--kaito-surface)] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.04em] text-[var(--kaito-muted)] shadow-sm dark:border-slate-800 dark:bg-slate-900/70 dark:text-slate-300">
-                  {dataSource === "upload"
-                    ? "Uploaded CSV"
-                    : selectedDataset
-                      ? selectedDataset.name
-                      : "Idle"}
-                </span>
-                <span className="kaito-meta rounded-full border border-[var(--kaito-border)] bg-[var(--kaito-surface)] px-3 py-1.5 shadow-sm">
-                  Warm utility
-                </span>
-              </div>
-            </header>
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="rounded-full border border-[var(--kaito-border)] bg-[var(--kaito-surface)] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.04em] text-[var(--kaito-muted)] shadow-sm dark:border-slate-800 dark:bg-slate-900/70 dark:text-slate-300">
+                {dataSource === "upload"
+                  ? "Uploaded CSV"
+                  : selectedDataset
+                    ? selectedDataset.name
+                    : "Idle"}
+              </span>
+              <span className="kaito-meta rounded-full border border-[var(--kaito-border)] bg-[var(--kaito-surface)] px-3 py-1.5 shadow-sm">
+                Warm utility
+              </span>
+            </div>
+          </motion.header>
 
-            <div className="flex-1 overflow-y-auto">
-              <div className="content-boundary py-8 lg:py-12">
-                <div className="dashboard-shell">
-                  {error && (
-                    <div className="panel border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-500/40 dark:bg-rose-500/10 dark:text-rose-100">
-                      <div className="flex items-start gap-3 p-4">
-                        <AlertCircle className="mt-0.5 h-5 w-5" />
-                        <div>
-                          <p className="font-semibold">Request failed</p>
-                          <p className="text-sm">{error}</p>
-                        </div>
+          <motion.div className="flex-1 overflow-y-auto" layout>
+            <div className="content-boundary py-8 lg:py-12">
+              <motion.div className="dashboard-shell" variants={containerVariants}>
+                {error && (
+                  <motion.div
+                    variants={itemVariants}
+                    layout
+                    className="panel border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-500/40 dark:bg-rose-500/10 dark:text-rose-100"
+                  >
+                    <div className="flex items-start gap-3 p-4">
+                      <AlertCircle className="mt-0.5 h-5 w-5" />
+                      <div>
+                        <p className="font-semibold">Request failed</p>
+                        <p className="text-sm">{error}</p>
                       </div>
                     </div>
-                  )}
+                  </motion.div>
+                )}
 
-                  <TopKpiRow
-                    rowsLabel={rowsLabel}
-                    horizonLabel={horizonLabel}
-                    confidenceLabel={confidenceLabel}
-                    statusLabel={statusText}
-                    bestMetric={bestMetric}
-                  />
-
+                <motion.div variants={itemVariants} layout custom={0.2}>
                   <ForecastChart
                     history={history}
                     forecasts={forecastHistory}
@@ -850,9 +871,21 @@ export const App = () => {
                     onQuickStart={firstDataset ? handleQuickStart : undefined}
                     quickLabel={firstDataset ? `Try ${firstDataset.name}` : undefined}
                   />
+                </motion.div>
 
+                <motion.div variants={itemVariants} layout custom={0.26}>
+                  <TopKpiRow
+                    rowsLabel={rowsLabel}
+                    horizonLabel={horizonLabel}
+                    confidenceLabel={confidenceLabel}
+                    statusLabel={statusText}
+                    bestMetric={bestMetric}
+                  />
+                </motion.div>
+
+                <motion.div variants={itemVariants} layout custom={0.34}>
                   <div className="mt-8 space-y-6">
-                    <div className="panel p-4">
+                    <motion.div className="panel p-4" layout variants={itemVariants} custom={0.38}>
                       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                         <div>
                           <p className="card-title">Forecast table</p>
@@ -877,21 +910,27 @@ export const App = () => {
                       </div>
 
                       <div className="mt-6 flex flex-wrap items-center gap-3">
-                        <button
+                        <motion.button
                           type="button"
                           onClick={() => setTableTab("forecast")}
+                          whileHover={{ y: -2, scale: 1.01 }}
+                          whileTap={{ scale: 0.99 }}
+                          transition={hoverSpring}
                           className={`rounded-full border px-4 py-1.5 text-[11px] font-semibold uppercase tracking-[0.04em] transition ${tableTab === "forecast" ? "border-[var(--kaito-border)] bg-[var(--kaito-surface)] text-[var(--kaito-ink)] shadow-[0_10px_28px_rgba(0,0,0,0.06)]" : "border-transparent text-[var(--kaito-muted)] hover:border-[var(--kaito-border)]"}`}
                         >
                           Forecast data
-                        </button>
+                        </motion.button>
 
-                        <button
+                        <motion.button
                           type="button"
                           onClick={() => setTableTab("leaderboard")}
+                          whileHover={{ y: -2, scale: 1.01 }}
+                          whileTap={{ scale: 0.99 }}
+                          transition={hoverSpring}
                           className={`rounded-full border px-4 py-1.5 text-[11px] font-semibold uppercase tracking-[0.04em] transition ${tableTab === "leaderboard" ? "border-[var(--kaito-border)] bg-[var(--kaito-surface)] text-[var(--kaito-ink)] shadow-[0_10px_28px_rgba(0,0,0,0.06)]" : "border-transparent text-[var(--kaito-muted)] hover:border-[var(--kaito-border)]"}`}
                         >
                           Model leaderboard
-                        </button>
+                        </motion.button>
                       </div>
 
                       {!latestForecast && (
@@ -935,15 +974,18 @@ export const App = () => {
                                 ? "Download this horizon as CSV."
                                 : "CSV export available after a run."}
                             </div>
-                            <button
+                            <motion.button
                               type="button"
                               disabled={!forecastRows.data.length}
                               onClick={() => buildDownloadCsv(latestForecast?.config ?? config, forecastRows)}
+                              whileHover={{ y: -2, scale: 1.01 }}
+                              whileTap={{ scale: 0.99 }}
+                              transition={hoverSpring}
                               className="inline-flex items-center gap-2 rounded-full border border-[var(--kaito-border)] px-4 py-2 text-sm font-semibold uppercase tracking-[0.04em] text-[var(--kaito-ink)] transition hover:shadow-[0_10px_24px_rgba(0,0,0,0.06)] disabled:cursor-not-allowed disabled:opacity-60"
                             >
                               <Download className="h-4 w-4" />
                               Download CSV
-                            </button>
+                            </motion.button>
                           </div>
                         </>
                       ) : (
@@ -1009,52 +1051,61 @@ export const App = () => {
                           )}
                         </div>
                       )}
-                    </div>
+                    </motion.div>
 
-                    <div className="panel p-4">
+                    <motion.div className="panel p-4" layout variants={itemVariants} custom={0.42}>
                       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                      <div>
-                        <p className="card-title">Benchmark &amp; Backtest</p>
-                        <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-                          Compare models and rolling windows
-                        </h3>
+                        <div>
+                          <p className="card-title">Benchmark &amp; Backtest</p>
+                          <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+                            Compare models and rolling windows
+                          </h3>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <motion.button
+                            type="button"
+                            onClick={handleSaveConfig}
+                            whileHover={{ y: -2, scale: 1.01 }}
+                            whileTap={{ scale: 0.99 }}
+                            transition={hoverSpring}
+                            className="inline-flex items-center gap-2 rounded-full border border-[var(--kaito-border)] px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.04em] text-[var(--kaito-ink)] transition hover:shadow-[0_10px_24px_rgba(0,0,0,0.06)]"
+                          >
+                            Save current config
+                          </motion.button>
+                          <motion.button
+                            type="button"
+                            onClick={handleBenchmarkRun}
+                            disabled={!hasDataLoaded || loading === "benchmark"}
+                            whileHover={{ y: -2, scale: 1.01 }}
+                            whileTap={{ scale: 0.99 }}
+                            transition={hoverSpring}
+                            className="inline-flex items-center gap-2 rounded-full border border-[var(--kaito-border)] px-4 py-2 text-sm font-semibold uppercase tracking-[0.04em] text-[var(--kaito-ink)] transition hover:shadow-[0_10px_24px_rgba(0,0,0,0.06)] disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            {loading === "benchmark" ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <BrainCircuit className="h-4 w-4" />
+                            )}
+                            Run benchmark
+                          </motion.button>
+                          <motion.button
+                            type="button"
+                            onClick={handleBacktestRun}
+                            disabled={!hasDataLoaded || loading === "backtest"}
+                            whileHover={{ y: -2, scale: 1.01 }}
+                            whileTap={{ scale: 0.99 }}
+                            transition={hoverSpring}
+                            className="inline-flex items-center gap-2 rounded-full border border-[var(--kaito-border)] px-4 py-2 text-sm font-semibold uppercase tracking-[0.04em] text-[var(--kaito-ink)] transition hover:shadow-[0_10px_24px_rgba(0,0,0,0.06)] disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            {loading === "backtest" ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Activity className="h-4 w-4" />
+                            )}
+                            Backtest
+                          </motion.button>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={handleSaveConfig}
-                          className="inline-flex items-center gap-2 rounded-full border border-[var(--kaito-border)] px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.04em] text-[var(--kaito-ink)] transition hover:shadow-[0_10px_24px_rgba(0,0,0,0.06)]"
-                        >
-                          Save current config
-                        </button>
-                        <button
-                          type="button"
-                          onClick={handleBenchmarkRun}
-                          disabled={!hasDataLoaded || loading === "benchmark"}
-                          className="inline-flex items-center gap-2 rounded-full border border-[var(--kaito-border)] px-4 py-2 text-sm font-semibold uppercase tracking-[0.04em] text-[var(--kaito-ink)] transition hover:shadow-[0_10px_24px_rgba(0,0,0,0.06)] disabled:cursor-not-allowed disabled:opacity-60"
-                        >
-                          {loading === "benchmark" ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <BrainCircuit className="h-4 w-4" />
-                          )}
-                          Run benchmark
-                        </button>
-                        <button
-                          type="button"
-                          onClick={handleBacktestRun}
-                          disabled={!hasDataLoaded || loading === "backtest"}
-                          className="inline-flex items-center gap-2 rounded-full border border-[var(--kaito-border)] px-4 py-2 text-sm font-semibold uppercase tracking-[0.04em] text-[var(--kaito-ink)] transition hover:shadow-[0_10px_24px_rgba(0,0,0,0.06)] disabled:cursor-not-allowed disabled:opacity-60"
-                        >
-                          {loading === "backtest" ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <Activity className="h-4 w-4" />
-                          )}
-                          Backtest
-                        </button>
-                      </div>
-                    </div>
 
                     <div className="mt-4 grid grid-cols-1 gap-6 lg:grid-cols-[320px,1fr]">
                       <div className="space-y-4 rounded-xl border border-[var(--kaito-border)] bg-[var(--kaito-surface)] p-5 shadow-[0_16px_38px_rgba(0,0,0,0.04)]">
@@ -1197,13 +1248,16 @@ export const App = () => {
                         <div className="rounded-xl border border-[var(--kaito-border)] bg-[var(--kaito-surface)] p-3 shadow-sm dark:border-slate-700 dark:bg-slate-900/70">
                           <div className="flex items-center justify-between">
                             <p className="text-sm font-semibold text-[var(--kaito-ink)] dark:text-slate-100">Saved configs</p>
-                            <button
+                            <motion.button
                               type="button"
                               onClick={refreshSavedConfigs}
+                              whileHover={{ y: -2, scale: 1.01 }}
+                              whileTap={{ scale: 0.99 }}
+                              transition={hoverSpring}
                               className="text-[11px] font-semibold uppercase tracking-[0.04em] text-[var(--kaito-muted)] transition hover:text-[var(--kaito-ink)]"
                             >
                               Refresh
-                            </button>
+                            </motion.button>
                           </div>
 
                           {savedConfigs.length ? (
@@ -1220,20 +1274,26 @@ export const App = () => {
                                     ) : null}
                                   </div>
                                   <div className="flex items-center gap-2">
-                                    <button
+                                    <motion.button
                                       type="button"
                                       onClick={() => handleLoadSavedConfig(item.id)}
+                                      whileHover={{ y: -2, scale: 1.01 }}
+                                      whileTap={{ scale: 0.99 }}
+                                      transition={hoverSpring}
                                       className="rounded-full border border-[var(--kaito-border)] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.04em] text-[var(--kaito-ink)] transition hover:shadow-[0_10px_24px_rgba(0,0,0,0.06)]"
                                     >
                                       Load
-                                    </button>
-                                    <button
+                                    </motion.button>
+                                    <motion.button
                                       type="button"
                                       onClick={() => handleDeleteSavedConfig(item.id)}
+                                      whileHover={{ y: -2, scale: 1.01 }}
+                                      whileTap={{ scale: 0.99 }}
+                                      transition={hoverSpring}
                                       className="rounded-full border border-[var(--kaito-border)] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.04em] text-[var(--kaito-ink)] transition hover:shadow-[0_10px_24px_rgba(0,0,0,0.06)]"
                                     >
                                       Delete
-                                    </button>
+                                    </motion.button>
                                   </div>
                                 </li>
                               ))}
@@ -1246,18 +1306,16 @@ export const App = () => {
                         </div>
                       </div>
                     </div>
-                  </div>
+                  </motion.div>
                 </div>
-              </div>
-            </div>
+              </motion.div>
+            </motion.div>
           </div>
-          </motion.main>
-        </div>
-      </PageWrapper>
-    </div>
-  );
+        </motion.div>
+      </motion.main>
+    </PageWrapper>
+  </div>
+);
 };
 
 export default App;
-
-

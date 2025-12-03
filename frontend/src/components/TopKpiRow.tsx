@@ -1,5 +1,7 @@
 import { BadgeDelta, Card, Metric, Text } from "@tremor/react";
 
+import { RevealText } from "./ui/Reveal";
+
 type Kpi = {
   label: string;
   value: string;
@@ -34,9 +36,10 @@ export function TopKpiRow({
 
   return (
     <div className="dashboard-top-row grid w-full grid-cols-1 divide-y divide-[#d1cec4] border-y border-[#d1cec4] md:grid-cols-4 md:divide-y-0 md:divide-x">
-      {kpis.map((kpi) => {
+      {kpis.map((kpi, idx) => {
         const isStatus = kpi.label === "Status";
         const displayValue = kpi.label === "Horizon" ? formatHorizon(kpi.value) : kpi.value;
+        const revealDelay = 0.08 + idx * 0.06;
         return (
           <Card
             key={kpi.label}
@@ -56,7 +59,7 @@ export function TopKpiRow({
                 </div>
                 <div className="kaito-status-body">
                   <Metric className="text-base font-semibold text-[#1a1a19]">
-                    {kpi.delta ?? displayValue}
+                    <RevealText delay={revealDelay}>{kpi.delta ?? displayValue}</RevealText>
                   </Metric>
                   <Text className="text-xs text-[#6a6459]">{kpi.value}</Text>
                 </div>
@@ -79,7 +82,7 @@ export function TopKpiRow({
                   ) : null}
                 </div>
                 <Metric className="shrink-0 text-base font-semibold text-[#1a1a19]">
-                  {displayValue}
+                  <RevealText delay={revealDelay}>{displayValue}</RevealText>
                 </Metric>
               </div>
             )}

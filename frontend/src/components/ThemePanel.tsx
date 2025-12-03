@@ -44,6 +44,15 @@ export const ThemePanel = ({
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.35 }}
     >
+      <div
+        className="pointer-events-none absolute inset-0 opacity-[0.04] mix-blend-soft-light"
+        style={{
+          backgroundImage:
+            "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 160 160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.7' numOctaves='2' stitchTiles='stitch'/></filter><rect width='160' height='160' filter='url(%23n)' opacity='0.45'/></svg>\")",
+          backgroundSize: "240px 240px",
+        }}
+        aria-hidden
+      />
       <div className="relative flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div className="flex items-center gap-3 text-[var(--kaito-ink)]">
           <span className="flex h-10 w-10 items-center justify-center rounded-xl border border-[var(--kaito-border)] bg-[var(--kaito-subtle)] text-[var(--kaito-ink)] shadow-sm">
@@ -68,6 +77,7 @@ export const ThemePanel = ({
               type="button"
               onClick={() => onPaletteChange(palette.id)}
               whileHover={{ y: -2 }}
+              transition={{ type: "spring", stiffness: 420, damping: 22 }}
               className={`group relative overflow-hidden rounded-xl border p-[1px] text-left transition ${
                 active
                   ? "border-[var(--kaito-accent)] shadow-[0_18px_40px_-24px_rgba(0,0,0,0.18)]"

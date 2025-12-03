@@ -1,5 +1,7 @@
 import { useMemo, useState } from "react";
 
+import { motion } from "framer-motion";
+
 import {
   Area,
   Brush,
@@ -12,6 +14,7 @@ import {
   YAxis,
 } from "recharts";
 
+import { fluidEase } from "./PageWrapper";
 import type { ForecastMetrics, ForecastRun, TimeSeriesRecord } from "../types";
 
 interface ForecastChartProps {
@@ -417,6 +420,8 @@ export const ForecastChart = ({
     { label: "Time", value: runDurationMs ? `${(runDurationMs / 1000).toFixed(1)}s` : "-" },
   ];
   const showSkeleton = loading && history.length === 0 && forecastSeries.length === 0;
+  const chartRevealKey = `${primarySeries?.dataKey ?? "chart"}-${data.length}-${loading ? "loading" : "ready"}`;
+  const hoverSpring = { type: "spring", stiffness: 420, damping: 20 };
 
   return (
     <div className="timeline-card panel relative box-border h-[440px] overflow-hidden p-6" aria-busy={loading}>
@@ -486,11 +491,14 @@ export const ForecastChart = ({
         ].map(({ key, label, disabled }) => {
           const active = focusedSeries === key;
           return (
-            <button
+            <motion.button
               key={key}
               type="button"
               disabled={disabled}
               onClick={() => setFocusedSeries((prev) => (prev === key ? null : key))}
+              whileHover={{ y: -2, scale: 1.01 }}
+              whileTap={{ scale: 0.99 }}
+              transition={hoverSpring}
               className={`rounded-full border px-3 py-1 font-semibold transition ${
                 active
                   ? "border-[#c25b00] bg-[#f2e8de] text-[#c25b00] shadow-sm dark:border-indigo-500/70 dark:bg-indigo-500/10 dark:text-indigo-100"
@@ -498,7 +506,7 @@ export const ForecastChart = ({
               } disabled:cursor-not-allowed disabled:opacity-50`}
             >
               {active ? `Focus: ${label}` : `Toggle ${label}`}
-            </button>
+            </motion.button>
           );
         })}
       </div>
@@ -565,133 +573,149 @@ export const ForecastChart = ({
           </div>
         ) : null}
         {hasData ? (
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={data} margin={{ top: 10, right: 24, left: 0, bottom: 0 }}>
-              <defs>
-                <linearGradient id="forecastGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor={primaryStroke} stopOpacity={0.28} />
-                  <stop offset="50%" stopColor={primaryStroke} stopOpacity={0.12} />
-                  <stop offset="100%" stopColor={primaryStroke} stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="4 4" stroke="#b0a899" strokeOpacity={0.45} />
-              <XAxis
-                dataKey="ds"
-                tickFormatter={formatLabel}
-                tick={{ fill: "#5c564d", fontSize: 11 }}
-                height={40}
-                allowDuplicatedCategory={false}
-                type="category"
-              />
-              <YAxis tick={{ fill: "#5c564d", fontSize: 11 }} />
-              <Tooltip
-                labelFormatter={formatLabel}
-                content={(props) => (
-                  <ForecastTooltip
-                    bands={showBands ? bandDescriptors : []}
-                    forecastSeries={forecastSeries}
-                    {...props}
+          <div className="relative h-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={data} margin={{ top: 10, right: 24, left: 0, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="forecastGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor={primaryStroke} stopOpacity={0.28} />
+                    <stop offset="50%" stopColor={primaryStroke} stopOpacity={0.12} />
+                    <stop offset="100%" stopColor={primaryStroke} stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="4 4" stroke="#b0a899" strokeOpacity={0.45} />
+                <XAxis
+                  dataKey="ds"
+                  tickFormatter={formatLabel}
+                  tick={{ fill: "#5c564d", fontSize: 11 }}
+                  height={40}
+                  allowDuplicatedCategory={false}
+                  type="category"
+                />
+                <YAxis tick={{ fill: "#5c564d", fontSize: 11 }} />
+                <Tooltip
+                  labelFormatter={formatLabel}
+                  content={(props) => (
+                    <ForecastTooltip
+                      bands={showBands ? bandDescriptors : []}
+                      forecastSeries={forecastSeries}
+                      {...props}
+                    />
+                  )}
+                />
+                {primarySeries ? (
+                  <Area
+                    type="monotone"
+                    dataKey={primarySeries.dataKey}
+                    stroke="none"
+                    fill="url(#forecastGradient)"
+                    fillOpacity={isDimmed(primarySeries.dataKey) ? 0.25 : 0.65}
+                    isAnimationActive={!loading}
+                    animationDuration={1600}
+                    animationEasing="ease-in-out"
+                  />
+                ) : null}
+                {showBands
+                  ? bandDescriptors.map((band, idx) => {
+                      const baseOpacity = bandOpacityByLevel.get(band.level) ?? 0.3;
+                      const boostedOpacity = Math.min(0.35, Math.max(0.22, baseOpacity));
+                      return (
+                        <Area
+                          key={`band-${band.level}-${band.rangeKey}`}
+                          type="monotone"
+                          dataKey={band.rangeKey}
+                          isRange
+                          stroke={colorSet.bandOutline}
+                          strokeOpacity={1}
+                          strokeWidth={3.2}
+                          fill={colorSet.bandFills[idx % colorSet.bandFills.length]}
+                          fillOpacity={boostedOpacity}
+                          isAnimationActive={!loading}
+                          animationDuration={1600 + idx * 140}
+                          animationEasing="ease-in-out"
+                          legendType="none"
+                        />
+                      );
+                    })
+                  : null}
+                <Brush
+                  dataKey="ds"
+                  height={24}
+                  stroke="#c25b00"
+                  travellerWidth={10}
+                  tickFormatter={formatLabel}
+                  fill="rgba(194,91,0,0.08)"
+                />
+                <Line
+                  type="monotone"
+                  dataKey="actual"
+                  stroke={strokeFor("train", colorSet.train)}
+                  strokeOpacity={opacityFor("train")}
+                  strokeWidth={2}
+                  dot={false}
+                  name="Train actuals"
+                  isAnimationActive={!loading}
+                  animationDuration={1650}
+                  animationEasing="ease-in-out"
+                />
+                {testSet.length > 0 && (
+                  <Line
+                    type="monotone"
+                    dataKey="testActual"
+                    stroke={strokeFor("test", colorSet.test)}
+                    strokeOpacity={opacityFor("test")}
+                    strokeWidth={2}
+                    dot={{ strokeWidth: 1.5, r: 2.5, fill: "#0f172a" }}
+                    name="Test actuals"
+                    isAnimationActive={!loading}
+                    animationDuration={1650}
+                    animationEasing="ease-in-out"
                   />
                 )}
-              />
-              {primarySeries ? (
-                <Area
-                  type="monotone"
-                  dataKey={primarySeries.dataKey}
-                  stroke="none"
-                  fill="url(#forecastGradient)"
-                  fillOpacity={isDimmed(primarySeries.dataKey) ? 0.25 : 0.65}
-                  isAnimationActive={!loading}
-                  animationDuration={1400}
-                />
-              ) : null}
-              {showBands
-                ? bandDescriptors.map((band, idx) => {
-                    const baseOpacity = bandOpacityByLevel.get(band.level) ?? 0.3;
-                    const boostedOpacity = Math.min(0.35, Math.max(0.22, baseOpacity));
-                    return (
-                      <Area
-                        key={`band-${band.level}-${band.rangeKey}`}
-                        type="monotone"
-                        dataKey={band.rangeKey}
-                        isRange
-                        stroke={colorSet.bandOutline}
-                        strokeOpacity={1}
-                        strokeWidth={3.2}
-                        fill={colorSet.bandFills[idx % colorSet.bandFills.length]}
-                        fillOpacity={boostedOpacity}
-                        isAnimationActive={!loading}
-                        animationDuration={1000 + idx * 120}
-                        legendType="none"
-                      />
-                    );
-                  })
-                : null}
-              <Brush
-                dataKey="ds"
-                height={24}
-                stroke="#c25b00"
-                travellerWidth={10}
-                tickFormatter={formatLabel}
-                fill="rgba(194,91,0,0.08)"
-              />
-              <Line
-                type="monotone"
-                dataKey="actual"
-                stroke={strokeFor("train", colorSet.train)}
-                strokeOpacity={opacityFor("train")}
-                strokeWidth={2}
-                dot={false}
-                name="Train actuals"
-                isAnimationActive={!loading}
-                animationDuration={1200}
-              />
-              {testSet.length > 0 && (
-                <Line
-                  type="monotone"
-                  dataKey="testActual"
-                  stroke={strokeFor("test", colorSet.test)}
-                  strokeOpacity={opacityFor("test")}
-                  strokeWidth={2}
-                  dot={{ strokeWidth: 1.5, r: 2.5, fill: "#0f172a" }}
-                  name="Test actuals"
-                  isAnimationActive={!loading}
-                  animationDuration={1200}
-                />
-              )}
-              {primaryForecast?.fitted && (
-                <Line
-                  type="monotone"
-                  dataKey="trainPrediction"
-                  stroke={strokeFor("fit", colorSet.fit)}
-                  strokeOpacity={opacityFor("fit")}
-                  strokeWidth={2}
-                  dot={false}
-                  name="Train fit"
-                  strokeDasharray="3 2"
-                  isAnimationActive={!loading}
-                  animationDuration={1200}
-                />
-              )}
-              {forecastSeries.map((series, idx) => (
-                <Line
-                  key={series.dataKey}
-                  type="monotone"
-                  dataKey={series.dataKey}
-                  stroke={strokeFor(series.dataKey, series.color)}
-                  strokeOpacity={opacityFor(series.dataKey)}
-                  strokeWidth={series.dataKey === primaryDataKey ? 2.8 : 2}
-                  dot={false}
-                  name={series.label}
-                  className={series.dataKey === primaryDataKey ? "line-glow" : undefined}
-                  isAnimationActive={!loading}
-                  animationDuration={1400 + idx * 80}
-                  strokeLinecap="round"
-                  connectNulls
-                />
-              ))}
-            </LineChart>
-          </ResponsiveContainer>
+                {primaryForecast?.fitted && (
+                  <Line
+                    type="monotone"
+                    dataKey="trainPrediction"
+                    stroke={strokeFor("fit", colorSet.fit)}
+                    strokeOpacity={opacityFor("fit")}
+                    strokeWidth={2}
+                    dot={false}
+                    name="Train fit"
+                    strokeDasharray="3 2"
+                    isAnimationActive={!loading}
+                    animationDuration={1650}
+                    animationEasing="ease-in-out"
+                  />
+                )}
+                {forecastSeries.map((series, idx) => (
+                  <Line
+                    key={series.dataKey}
+                    type="monotone"
+                    dataKey={series.dataKey}
+                    stroke={strokeFor(series.dataKey, series.color)}
+                    strokeOpacity={opacityFor(series.dataKey)}
+                    strokeWidth={series.dataKey === primaryDataKey ? 2.8 : 2}
+                    dot={false}
+                    name={series.label}
+                    className={series.dataKey === primaryDataKey ? "line-glow" : undefined}
+                    isAnimationActive={!loading}
+                    animationDuration={1700 + idx * 90}
+                    animationEasing="ease-in-out"
+                    strokeLinecap="round"
+                    connectNulls
+                  />
+                ))}
+              </LineChart>
+            </ResponsiveContainer>
+            <motion.div
+              key={chartRevealKey}
+              className="pointer-events-none absolute inset-0 z-10 bg-gradient-to-b from-[var(--kaito-bg)] via-[var(--kaito-bg)]/85 to-transparent"
+              initial={{ scaleY: 1 }}
+              animate={{ scaleY: 0 }}
+              transition={{ duration: 1.4, ease: fluidEase }}
+              style={{ transformOrigin: "top" }}
+            />
+          </div>
         ) : (
           <div className="flex h-full flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-slate-300 text-sm text-slate-500 dark:border-slate-700 dark:text-slate-400">
             <div className="text-center leading-tight">
@@ -702,14 +726,17 @@ export const ForecastChart = ({
                 We will run a quick default forecast for you.
               </p>
             </div>
-            <button
+            <motion.button
               type="button"
               onClick={onQuickStart}
               disabled={!onQuickStart}
+              whileHover={{ y: -2, scale: 1.01 }}
+              whileTap={{ scale: 0.99 }}
+              transition={hoverSpring}
               className="inline-flex items-center gap-2 rounded-lg border border-indigo-200 px-4 py-2 text-sm font-semibold text-indigo-700 transition hover:border-indigo-300 hover:bg-indigo-50 dark:border-indigo-500/50 dark:text-indigo-100 dark:hover:border-indigo-400/70 dark:hover:bg-indigo-500/10 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {quickLabel ?? "Try with sample data"}
-            </button>
+            </motion.button>
           </div>
         )}
       </div>
