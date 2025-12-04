@@ -457,7 +457,6 @@ export const ForecastChart = ({
         {[
           { key: "train", label: "Train actuals", disabled: data.length === 0 },
           { key: "test", label: "Test actuals", disabled: testSet.length === 0 },
-          { key: "fit", label: "Train fit", disabled: !primaryForecast?.fitted },
           ...forecastSeries.map((series) => ({
             key: series.dataKey,
             label: series.label,
