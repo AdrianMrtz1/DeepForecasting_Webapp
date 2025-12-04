@@ -12,6 +12,7 @@ import {
   Tooltip,
   XAxis,
   YAxis,
+  ReferenceLine,
 } from "recharts";
 
 import { fluidEase } from "./PageWrapper";
@@ -84,13 +85,6 @@ const FORECAST_COLORS = [
   "#f43f5e",
 ];
 
-type ForecastTooltipProps = {
-  active?: boolean;
-  payload?: ReadonlyArray<{ payload?: ChartPoint }>;
-  label?: string | number;
-  bands: ConfidenceBand[];
-};
-
 type ForecastLine = {
   run: ForecastRun;
   dataKey: string;
@@ -103,80 +97,6 @@ type ConfidenceBand = {
   lowerKey: string;
   upperKey: string;
   rangeKey: string;
-};
-
-const ForecastTooltip = ({
-  active,
-  payload,
-  label,
-  bands,
-  forecastSeries,
-}: ForecastTooltipProps & { forecastSeries: ForecastLine[] }) => {
-  if (!active || !payload?.length) return null;
-  const point: ChartPoint | undefined = payload[0]?.payload;
-  if (!point) return null;
-  const forecastRows = forecastSeries
-    .map((series) => {
-      const value = point?.[series.dataKey] as number | undefined;
-      if (value === undefined) return null;
-      return { ...series, value };
-    })
-    .filter(Boolean) as Array<ForecastLine & { value: number }>;
-
-  return (
-    <div className="rounded-lg border border-[#c0b2a3] bg-[var(--kaito-surface)] px-3 py-2 shadow-md shadow-black/10 dark:border-slate-800 dark:bg-slate-900/90">
-      <p className="text-xs text-[#6a655b] dark:text-slate-400">{formatLabel(label)}</p>
-      <div className="mt-1 space-y-1 text-sm text-[#2f2a24] dark:text-slate-100">
-        {point.actual !== undefined && (
-          <div className="text-[#222] dark:text-blue-300">Actual: {point.actual.toFixed(3)}</div>
-        )}
-        {point.testActual !== undefined && (
-          <div className="text-[#4a473f] dark:text-amber-300">
-            Test actual: {point.testActual.toFixed(3)}
-          </div>
-        )}
-        {point.trainPrediction !== undefined && (
-          <div className="text-[#6f6458] dark:text-indigo-300">
-            Train fit: {point.trainPrediction.toFixed(3)}
-          </div>
-        )}
-        {forecastRows.map((series) => (
-          <div
-            key={series.dataKey}
-            className="flex items-center justify-between gap-2 text-[#c25b00] dark:text-emerald-300"
-          >
-            <span className="flex items-center gap-2">
-              <span
-                className="h-2.5 w-2.5 rounded-full"
-                style={{ backgroundColor: series.color }}
-                aria-hidden
-              />
-              <span className="text-[#2f2a24] dark:text-slate-100">{series.label}</span>
-            </span>
-            <span className="font-mono text-[#2f2a24] dark:text-slate-100">
-              {series.value.toFixed(3)}
-            </span>
-          </div>
-        ))}
-        {bands.map((band) => {
-          const lower = point[band.lowerKey] as number | undefined;
-          const upper = point[band.upperKey] as number | undefined;
-          if (typeof lower !== "number" || typeof upper !== "number") return null;
-          return (
-            <div
-              key={`tooltip-${band.level}-${band.lowerKey}-${band.upperKey}`}
-              className="flex items-center justify-between text-xs text-slate-600 dark:text-slate-400"
-            >
-              <span>{band.level ? `${band.level}% band` : "Band"}</span>
-              <span className="font-mono text-slate-900 dark:text-slate-100">
-                {lower.toFixed(3)} - {upper.toFixed(3)}
-              </span>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
 };
 
 const formatMetric = (value?: number | null) =>
@@ -199,6 +119,10 @@ export const ForecastChart = ({
   upperBoundKey,
 }: ForecastChartProps) => {
   const [focusedSeries, setFocusedSeries] = useState<string | null>(null);
+  const [hoveredPoint, setHoveredPoint] = useState<{
+    label: string | number;
+    point: ChartPoint | null;
+  } | null>(null);
   const forecastSeries = useMemo<ForecastLine[]>(() => {
     const palette = FORECAST_COLORS;
     return (forecasts ?? []).map((run, idx) => {
@@ -289,6 +213,11 @@ export const ForecastChart = ({
     });
     return mapped;
   }, [bandDescriptors, boundsMap]);
+  const hatchId = useMemo(
+    () => `diagonalHatch-${Math.random().toString(36).slice(2, 7)}`,
+    [],
+  );
+  const noiseId = useMemo(() => `chartNoise-${Math.random().toString(36).slice(2, 7)}`, []);
   const moduleBadge = primaryForecast
     ? `${primaryForecast.config.module_type} / ${primaryForecast.config.model_type.toUpperCase()}`
     : "Awaiting run";
@@ -396,19 +325,65 @@ export const ForecastChart = ({
     const fitStroke = "#8c7968";
     const bandBase =
       bandSourceSeries?.color ?? focusedForecastSeries?.color ?? primaryStroke ?? "#c25b00";
-    const bandFills = [
-      hexToRgba(bandBase, 0.26),
-      hexToRgba(bandBase, 0.18),
-      hexToRgba(bandBase, 0.12),
-    ];
+    const bandWash = hexToRgba(bandBase, 0.08);
     return {
       train: trainStroke,
       test: testStroke,
       fit: fitStroke,
       bandOutline: bandBase,
-      bandFills,
+      bandWash,
     };
   }, [bandSourceSeries?.color, focusedForecastSeries?.color, primaryStroke, warmColor, _secondaryColor]);
+  const handleMouseMove = (state: any) => {
+    const point = state?.activePayload?.[0]?.payload as ChartPoint | undefined;
+    const label = state?.activeLabel as string | number | undefined;
+    if (!point || label === undefined || label === null) {
+      setHoveredPoint(null);
+      return;
+    }
+    setHoveredPoint({ label, point });
+  };
+  const hudRows = useMemo(
+    () => {
+      if (!hoveredPoint?.point) return [];
+      const point = hoveredPoint.point;
+      const rows: { key: string; label: string; value: string; color?: string }[] = [];
+      if (typeof point.actual === "number") {
+        rows.push({ key: "train", label: "Train", value: point.actual.toFixed(3), color: colorSet.train });
+      }
+      if (typeof point.testActual === "number") {
+        rows.push({
+          key: "test",
+          label: "Test",
+          value: point.testActual.toFixed(3),
+          color: colorSet.test,
+        });
+      }
+      if (typeof point.trainPrediction === "number") {
+        rows.push({
+          key: "fit",
+          label: "Train fit",
+          value: point.trainPrediction.toFixed(3),
+          color: colorSet.fit,
+        });
+      }
+      forecastSeries.forEach((series) => {
+        const value = point[series.dataKey];
+        if (typeof value === "number") {
+          rows.push({
+            key: series.dataKey,
+            label: series.label,
+            value: value.toFixed(3),
+            color: series.color,
+          });
+        }
+      });
+      return rows;
+    },
+    [hoveredPoint, forecastSeries, colorSet],
+  );
+  const crosshairX = hoveredPoint?.label ?? null;
+  const hudLabel = hoveredPoint ? formatLabel(hoveredPoint.label) : null;
 
   const strokeFor = (key: string, color: string) => (isDimmed(key) ? "#7d7368" : color);
   const opacityFor = (key: string) => (isDimmed(key) ? 0.35 : 1);
@@ -575,13 +550,25 @@ export const ForecastChart = ({
         {hasData ? (
           <div className="relative h-full">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={data} margin={{ top: 10, right: 24, left: 0, bottom: 0 }}>
+              <LineChart
+                data={data}
+                margin={{ top: 10, right: 24, left: 0, bottom: 0 }}
+                onMouseMove={handleMouseMove}
+                onMouseLeave={() => setHoveredPoint(null)}
+              >
                 <defs>
                   <linearGradient id="forecastGradient" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="0%" stopColor={primaryStroke} stopOpacity={0.28} />
                     <stop offset="50%" stopColor={primaryStroke} stopOpacity={0.12} />
                     <stop offset="100%" stopColor={primaryStroke} stopOpacity={0} />
                   </linearGradient>
+                  <pattern id={hatchId} patternUnits="userSpaceOnUse" width="4" height="4">
+                    <rect width="4" height="4" fill={colorSet.bandWash} />
+                    <path
+                      d="M-1,1 l2,-2 M0,4 l4,-4 M3,5 l2,-2"
+                      style={{ stroke: colorSet.bandOutline, strokeWidth: 0.5, opacity: 0.3 }}
+                    />
+                  </pattern>
                 </defs>
                 <CartesianGrid strokeDasharray="4 4" stroke="#b0a899" strokeOpacity={0.45} />
                 <XAxis
@@ -595,13 +582,8 @@ export const ForecastChart = ({
                 <YAxis tick={{ fill: "#5c564d", fontSize: 11 }} />
                 <Tooltip
                   labelFormatter={formatLabel}
-                  content={(props) => (
-                    <ForecastTooltip
-                      bands={showBands ? bandDescriptors : []}
-                      forecastSeries={forecastSeries}
-                      {...props}
-                    />
-                  )}
+                  content={() => null}
+                  cursor={false}
                 />
                 {primarySeries ? (
                   <Area
@@ -628,8 +610,8 @@ export const ForecastChart = ({
                           stroke={colorSet.bandOutline}
                           strokeOpacity={1}
                           strokeWidth={3.2}
-                          fill={colorSet.bandFills[idx % colorSet.bandFills.length]}
-                          fillOpacity={boostedOpacity}
+                          fill={`url(#${hatchId})`}
+                          fillOpacity={Math.min(0.65, boostedOpacity + 0.1)}
                           isAnimationActive={!loading}
                           animationDuration={1600 + idx * 140}
                           animationEasing="ease-in-out"
@@ -638,6 +620,16 @@ export const ForecastChart = ({
                       );
                     })
                   : null}
+                {crosshairX ? (
+                  <ReferenceLine
+                    x={crosshairX}
+                    stroke="#1f1c19"
+                    strokeOpacity={0.38}
+                    strokeDasharray="3 2"
+                    strokeWidth={1.25}
+                    isFront
+                  />
+                ) : null}
                 <Brush
                   dataKey="ds"
                   height={24}
@@ -651,8 +643,13 @@ export const ForecastChart = ({
                   dataKey="actual"
                   stroke={strokeFor("train", colorSet.train)}
                   strokeOpacity={opacityFor("train")}
-                  strokeWidth={2}
-                  dot={false}
+                  strokeWidth={1.5}
+                  dot={{
+                    r: 4.5,
+                    stroke: strokeFor("train", colorSet.train),
+                    strokeWidth: 1.4,
+                    fill: "var(--paper-bg)",
+                  }}
                   name="Train actuals"
                   isAnimationActive={!loading}
                   animationDuration={1650}
@@ -660,29 +657,34 @@ export const ForecastChart = ({
                 />
                 {testSet.length > 0 && (
                   <Line
-                    type="monotone"
-                    dataKey="testActual"
-                    stroke={strokeFor("test", colorSet.test)}
-                    strokeOpacity={opacityFor("test")}
-                    strokeWidth={2}
-                    dot={{ strokeWidth: 1.5, r: 2.5, fill: "#0f172a" }}
-                    name="Test actuals"
-                    isAnimationActive={!loading}
-                    animationDuration={1650}
+                  type="monotone"
+                  dataKey="testActual"
+                  stroke={strokeFor("test", colorSet.test)}
+                  strokeOpacity={opacityFor("test")}
+                  strokeWidth={1.5}
+                  dot={{
+                    strokeWidth: 1.3,
+                    r: 4.3,
+                    stroke: strokeFor("test", colorSet.test),
+                    fill: "var(--paper-bg)",
+                  }}
+                  name="Test actuals"
+                  isAnimationActive={!loading}
+                  animationDuration={1650}
                     animationEasing="ease-in-out"
                   />
                 )}
                 {primaryForecast?.fitted && (
                   <Line
-                    type="monotone"
-                    dataKey="trainPrediction"
-                    stroke={strokeFor("fit", colorSet.fit)}
-                    strokeOpacity={opacityFor("fit")}
-                    strokeWidth={2}
-                    dot={false}
-                    name="Train fit"
-                    strokeDasharray="3 2"
-                    isAnimationActive={!loading}
+                  type="monotone"
+                  dataKey="trainPrediction"
+                  stroke={strokeFor("fit", colorSet.fit)}
+                  strokeOpacity={opacityFor("fit")}
+                  strokeWidth={1.25}
+                  dot={false}
+                  name="Train fit"
+                  strokeDasharray="3 2"
+                  isAnimationActive={!loading}
                     animationDuration={1650}
                     animationEasing="ease-in-out"
                   />
@@ -691,12 +693,12 @@ export const ForecastChart = ({
                   <Line
                     key={series.dataKey}
                     type="monotone"
-                    dataKey={series.dataKey}
-                    stroke={strokeFor(series.dataKey, series.color)}
-                    strokeOpacity={opacityFor(series.dataKey)}
-                    strokeWidth={series.dataKey === primaryDataKey ? 2.8 : 2}
-                    dot={false}
-                    name={series.label}
+                  dataKey={series.dataKey}
+                  stroke={strokeFor(series.dataKey, series.color)}
+                  strokeOpacity={opacityFor(series.dataKey)}
+                  strokeWidth={series.dataKey === primaryDataKey ? 2.1 : 1.6}
+                  dot={false}
+                  name={series.label}
                     className={series.dataKey === primaryDataKey ? "line-glow" : undefined}
                     isAnimationActive={!loading}
                     animationDuration={1700 + idx * 90}
@@ -707,6 +709,51 @@ export const ForecastChart = ({
                 ))}
               </LineChart>
             </ResponsiveContainer>
+            <svg
+              className="pointer-events-none absolute inset-0 opacity-30"
+              aria-hidden
+              style={{ mixBlendMode: "multiply" }}
+            >
+              <filter id={noiseId}>
+                <feTurbulence type="fractalNoise" baseFrequency="0.65" numOctaves="2" stitchTiles="stitch">
+                  <animate
+                    attributeName="baseFrequency"
+                    dur="11s"
+                    values="0.35;0.6;0.45;0.58;0.4;0.35"
+                    repeatCount="indefinite"
+                  />
+                </feTurbulence>
+              </filter>
+              <rect width="100%" height="100%" filter={`url(#${noiseId})`} opacity="0.18" />
+            </svg>
+            {hudRows.length > 0 && hudLabel ? (
+              <div className="chart-hud pointer-events-none absolute right-3 top-3 z-20 rounded-xl px-3 py-2 text-xs text-[#2f2a24] dark:border-slate-800 dark:bg-slate-900/80 dark:text-slate-100">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#6a655b] dark:text-slate-400">
+                    {hudLabel}
+                  </span>
+                  <span className="rounded-full bg-[#1f1c19]/5 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-[#2f2a24] dark:bg-white/10 dark:text-slate-100">
+                    HUD
+                  </span>
+                </div>
+                <div className="mt-2 space-y-1">
+                  {hudRows.map((row) => (
+                    <div key={row.key} className="flex items-center justify-between gap-3">
+                      <span className="flex items-center gap-2">
+                        <span
+                          className="h-2.5 w-2.5 rounded-full border border-[#1f1c19]/30"
+                          style={{ backgroundColor: "transparent", borderColor: row.color ?? "#1f1c19" }}
+                        />
+                        <span>{row.label}</span>
+                      </span>
+                      <span className="font-mono text-[13px] text-[#1f1c19] dark:text-slate-100">
+                        {row.value}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
             <motion.div
               key={chartRevealKey}
               className="pointer-events-none absolute inset-0 z-10 bg-gradient-to-b from-[var(--kaito-bg)] via-[var(--kaito-bg)]/85 to-transparent"

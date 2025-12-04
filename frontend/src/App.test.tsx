@@ -69,6 +69,9 @@ describe("Deep Forecasting frontend", () => {
       </QueryClientProvider>,
     );
 
+    const expandButtons = await screen.findAllByRole("button", { name: /expand/i });
+    expandButtons.forEach((btn) => fireEvent.click(btn));
+
     const file = new File(["ds,y\n2024-01-01,1\n2024-01-02,2"], "data.csv", {
       type: "text/csv",
     });
@@ -87,7 +90,7 @@ describe("Deep Forecasting frontend", () => {
       );
     });
 
-    const runButton = screen.getByRole("button", { name: /run forecast/i });
+    const runButton = screen.getByRole("button", { name: /compute horizon/i });
     fireEvent.click(runButton);
 
     await waitFor(() => {

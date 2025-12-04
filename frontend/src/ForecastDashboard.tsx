@@ -78,7 +78,7 @@ const buildDownloadCsv = (
 
 
 
-const buildSettingsTooltip = (settings: ForecastConfigState) => {
+const buildParametersTooltip = (settings: ForecastConfigState) => {
 
   const testSplit = settings.test_size_fraction
 
@@ -996,7 +996,7 @@ export const App = () => {
                                 <tr>
                                   <th className="px-3 py-2 font-semibold">Model</th>
                                   <th className="px-3 py-2 font-semibold">Module</th>
-                                  <th className="px-3 py-2 font-semibold">Settings</th>
+                                  <th className="px-3 py-2 font-semibold">Parameters</th>
                                   <th className="px-3 py-2 font-semibold text-right">RMSE</th>
                                   <th className="px-3 py-2 font-semibold text-right">MAE</th>
                                   <th className="px-3 py-2 font-semibold text-right">MAPE</th>
@@ -1015,7 +1015,7 @@ export const App = () => {
                                     <td className="px-3 py-2">
                                       <span
                                         className="inline-flex items-center gap-1 rounded-full border border-slate-200 px-2 py-1 text-[11px] font-semibold text-slate-700 shadow-sm dark:border-slate-700 dark:text-slate-200"
-                                        title={buildSettingsTooltip(row.settings)}
+                                        title={buildParametersTooltip(row.settings)}
                                       >
                                         <Info className="h-3.5 w-3.5" />
                                         View

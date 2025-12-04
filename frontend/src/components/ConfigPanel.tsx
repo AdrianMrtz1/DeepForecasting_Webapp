@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import { motion } from "framer-motion";
+import { useMemo, useState, type MouseEvent } from "react";
+import { motion, useMotionValue, useSpring } from "framer-motion";
 
 import { ChevronDown, Loader2, Play, Settings2, SlidersHorizontal } from "lucide-react";
 
@@ -76,6 +76,30 @@ const animationItem = {
   show: { opacity: 1, y: 0 },
 };
 
+const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
+
+const useMagneticMotion = () => {
+  const x = useMotionValue(0);
+  const y = useMotionValue(0);
+  const springX = useSpring(x, { stiffness: 240, damping: 16, mass: 0.35 });
+  const springY = useSpring(y, { stiffness: 240, damping: 16, mass: 0.35 });
+
+  const handleMove = (event: MouseEvent<HTMLElement>) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    const dx = event.clientX - (rect.left + rect.width / 2);
+    const dy = event.clientY - (rect.top + rect.height / 2);
+    x.set(clamp(dx * 0.18, -10, 10));
+    y.set(clamp(dy * 0.18, -10, 10));
+  };
+
+  const reset = () => {
+    x.set(0);
+    y.set(0);
+  };
+
+  return { springX, springY, handleMove, reset };
+};
+
 export const ConfigPanel = ({
   config,
   onChange,
@@ -127,6 +151,7 @@ export const ConfigPanel = ({
   };
 
   const canRun = Boolean(onRun) && dataReady && !disabled && !running;
+  const runMagnet = useMagneticMotion();
 
   return (
     <div className="panel relative w-full max-w-full overscroll-contain scrollbar-thin scrollbar-thumb-slate-200 scrollbar-track-transparent">
@@ -136,8 +161,8 @@ export const ConfigPanel = ({
             <Settings2 className="h-5 w-5" />
           </div>
           <div>
-            <p className="card-title">Configuration</p>
-            <h3 className="text-lg font-semibold leading-tight">Forecast setup</h3>
+            <p className="card-title">Parameters</p>
+            <h3 className="text-lg font-semibold leading-tight">Forecast rig</h3>
           </div>
         </div>
         <button
@@ -378,7 +403,7 @@ export const ConfigPanel = ({
         <div className="flex items-center justify-between rounded-[4px] bg-[var(--kaito-subtle)] px-4 py-3 text-xs text-[var(--kaito-muted)] dark:bg-slate-900/60 dark:text-slate-200">
             <div className="flex items-center gap-2">
               <SlidersHorizontal className="h-4 w-4 text-indigo-500" />
-              <span>Advanced settings: strategy, seasonality, confidence, hyperparameters</span>
+              <span>Advanced parameters: strategy, seasonality, confidence, hyperparameters</span>
             </div>
             <button
               type="button"
@@ -635,26 +660,29 @@ export const ConfigPanel = ({
         <div className="sticky bottom-0 z-10 -mx-6 -mb-6 mt-4 border-t border-[var(--kaito-border)] bg-[var(--kaito-surface)] p-4 text-sm text-[var(--kaito-ink)] dark:border-slate-800 dark:bg-slate-900/70">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <p className="font-semibold">Run forecast</p>
+                <p className="font-semibold">Compute horizon</p>
                 <p className="text-xs text-slate-600 dark:text-slate-300">
                   {dataReady
-                    ? "Data is loaded. Apply your settings, then run."
-                    : "Load a sample or upload to enable the run button."}
+                    ? "Data is staged. Tune parameters, then compute a horizon."
+                    : "Load a sample or upload to enable the run control."}
                 </p>
               </div>
-              <button
+              <motion.button
                 type="button"
                 onClick={() => (onRun ? onRun() : undefined)}
                 disabled={!canRun}
-                className="inline-flex items-center justify-center gap-2 rounded-[4px] bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm shadow-indigo-500/30 transition hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-60"
+                onMouseMove={runMagnet.handleMove}
+                onMouseLeave={runMagnet.reset}
+                style={{ x: runMagnet.springX, y: runMagnet.springY }}
+                className="inline-flex items-center justify-center gap-2 rounded-[4px] bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm shadow-indigo-500/30 transition hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-60 will-change-transform"
               >
                 {running ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : (
                   <Play className="h-4 w-4" />
                 )}
-                {running ? "Training..." : "Run forecast"}
-              </button>
+                {running ? "Training..." : "Compute horizon"}
+              </motion.button>
             </div>
           </div>
         </div>

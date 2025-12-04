@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { motion } from "framer-motion";
 import { flexRender, getCoreRowModel, getSortedRowModel, useReactTable } from "@tanstack/react-table";
 import type { ColumnDef, SortingState } from "@tanstack/react-table";
 
@@ -14,6 +15,15 @@ interface Props {
   data: Row[];
   intervals: number[];
 }
+
+const container = {
+  show: { transition: { staggerChildren: 0.03 } },
+};
+
+const item = {
+  hidden: { opacity: 0, y: 5 },
+  show: { opacity: 1, y: 0, transition: { ease: [0.25, 1, 0.5, 1], duration: 0.4 } },
+};
 
 export function ForecastDataTable({ data, intervals }: Props) {
   const intervalColumns = useMemo<ColumnDef<Row>[]>(
@@ -86,17 +96,17 @@ export function ForecastDataTable({ data, intervals }: Props) {
               </tr>
             ))}
           </thead>
-          <tbody>
+          <motion.tbody variants={container} initial="hidden" animate="show">
             {table.getRowModel().rows.map((row) => (
-              <tr key={row.id} className="border-t border-[#d5cbbf]">
+              <motion.tr variants={item} key={row.id} className="border-t border-[#d5cbbf]">
                 {row.getVisibleCells().map((cell) => (
                   <td key={cell.id} className="px-3 py-2">
                     {flexRender(cell.column.columnDef.cell, cell.getContext())}
                   </td>
                 ))}
-              </tr>
+              </motion.tr>
             ))}
-          </tbody>
+          </motion.tbody>
         </table>
       </div>
     </div>

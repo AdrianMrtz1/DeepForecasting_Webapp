@@ -175,13 +175,13 @@ export const Home = () => {
             initial="hidden"
             whileInView="show"
             viewport={{ once: true, margin: "-80px" }}
-            className="grid gap-5 md:grid-cols-3 md:grid-rows-2"
+            className="grid auto-rows-[minmax(160px,auto)] gap-5 md:grid-cols-12"
           >
             <motion.article
               variants={cardVariants}
               custom={0}
               style={{ y: cardParallaxA }}
-              className="card-hover relative overflow-hidden rounded-[18px] border border-[var(--paper-border)] bg-[var(--paper-surface)] p-6 shadow-sm md:row-span-2"
+              className="card-hover relative overflow-hidden rounded-[18px] border border-[var(--paper-border)] bg-[var(--paper-surface)] p-6 shadow-sm md:col-span-7 md:row-span-2"
             >
               <div className="flex items-center justify-between text-xs uppercase tracking-[0.16em] text-[var(--paper-muted)]">
                 <span>Product thinking / Data storytelling</span>
@@ -204,7 +204,7 @@ export const Home = () => {
               variants={cardVariants}
               custom={1}
               style={{ y: cardParallaxB }}
-              className="card-hover rounded-[18px] border border-[var(--paper-border)] bg-[var(--paper-surface)] p-6 shadow-sm md:col-span-2"
+              className="card-hover rounded-[18px] border border-[var(--paper-border)] bg-[var(--paper-surface)] p-6 shadow-sm md:col-span-5"
             >
               <p className="text-xs uppercase tracking-[0.16em] text-[var(--paper-muted)]">About</p>
               <h3 className="mt-3 text-xl text-[var(--paper-ink)]">Building calm, intentional tools.</h3>
@@ -218,7 +218,7 @@ export const Home = () => {
               variants={cardVariants}
               custom={2}
               style={{ y: cardParallaxC }}
-              className="card-hover rounded-[18px] border border-[var(--paper-border)] bg-[var(--paper-surface)] p-6 shadow-sm md:col-span-2"
+              className="card-hover rounded-[18px] border border-[var(--paper-border)] bg-[var(--paper-surface)] p-6 shadow-sm md:col-span-5"
             >
               <div className="grid gap-3 text-[var(--paper-muted)] sm:grid-cols-2 sm:gap-4">
                 {[
