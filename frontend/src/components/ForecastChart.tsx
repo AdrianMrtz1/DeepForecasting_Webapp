@@ -1,6 +1,6 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
-import { motion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 
 import {
   Area,
@@ -8,6 +8,7 @@ import {
   CartesianGrid,
   Line,
   LineChart,
+  ReferenceArea,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -16,6 +17,7 @@ import {
 
 import { fluidEase } from "./PageWrapper";
 import type { ForecastMetrics, ForecastRun, TimeSeriesRecord } from "../types";
+import { formatModelName } from "../utils/modelNames";
 
 interface ForecastChartProps {
   history?: TimeSeriesRecord[];
@@ -36,10 +38,13 @@ interface ForecastChartProps {
 
 type ChartPoint = {
   ds: string;
+  xValue: number;
   actual?: number;
   testActual?: number;
   trainPrediction?: number;
 } & Record<string, number | [number, number] | string | undefined>;
+
+type DomainValue = number | "dataMin" | "dataMax";
 
 const toDateValue = (value: string) => {
   const t = new Date(value).getTime();
@@ -117,11 +122,17 @@ export const ForecastChart = ({
   lowerBoundKey,
   upperBoundKey,
 }: ForecastChartProps) => {
-  const [focusedSeries, setFocusedSeries] = useState<string | null>(null);
+  const [controlsOpen, setControlsOpen] = useState(false);
+  const [visibleSeries, setVisibleSeries] = useState<Record<string, boolean>>({});
   const [hoveredPoint, setHoveredPoint] = useState<{
     label: string | number;
     point: ChartPoint | null;
   } | null>(null);
+  const [refAreaLeft, setRefAreaLeft] = useState<number | null>(null);
+  const [refAreaRight, setRefAreaRight] = useState<number | null>(null);
+  const [left, setLeft] = useState<DomainValue>("dataMin");
+  const [right, setRight] = useState<DomainValue>("dataMax");
+  const isSeriesVisible = (key: string) => visibleSeries[key] !== false;
   const forecastSeries = useMemo<ForecastLine[]>(() => {
     const palette = FORECAST_COLORS;
     return (forecasts ?? []).map((run, idx) => {
@@ -130,35 +141,40 @@ export const ForecastChart = ({
         run,
         dataKey: `forecast_${safeId}`,
         color: palette[idx % palette.length],
-        label: `${run.config.model_type.toUpperCase()} (${run.config.module_type})`,
+        label: formatModelName(run.config.module_type, run.config.model_type),
       };
     });
   }, [forecasts]);
   const primarySeries = forecastSeries[forecastSeries.length - 1] ?? null;
   const primaryForecast = primarySeries?.run ?? null;
   const primaryDataKey = primarySeries?.dataKey ?? "forecast_primary";
-  const focusedForecastSeries =
-    focusedSeries !== null
-      ? forecastSeries.find((series) => series.dataKey === focusedSeries) ?? null
-      : null;
-  const latestStatsForecastSeries =
-    forecastSeries
-      .slice()
-      .reverse()
-      .find(
-        (series) =>
-          series.run.config.module_type === "StatsForecast" &&
-          (series.run.bounds?.length ?? 0) > 0,
-      ) ?? null;
-  const bandSourceSeries =
-    focusedForecastSeries &&
-    focusedForecastSeries.run.config.module_type === "StatsForecast" &&
-    (focusedForecastSeries.run.bounds?.length ?? 0) > 0
-      ? focusedForecastSeries
-      : latestStatsForecastSeries;
+  const bandSourceSeries = useMemo(() => {
+    const visibleStats =
+      forecastSeries
+        .slice()
+        .reverse()
+        .find(
+          (series) =>
+            isSeriesVisible(series.dataKey) &&
+            series.run.config.module_type === "StatsForecast" &&
+            (series.run.bounds?.length ?? 0) > 0,
+        ) ?? null;
+    if (visibleStats) return visibleStats;
+    return (
+      forecastSeries
+        .slice()
+        .reverse()
+        .find(
+          (series) =>
+            series.run.config.module_type === "StatsForecast" &&
+            (series.run.bounds?.length ?? 0) > 0,
+        ) ?? null
+    );
+  }, [forecastSeries, visibleSeries]);
   const bandForecast = bandSourceSeries?.run ?? null;
   const primaryStroke = primarySeries?.color ?? _accentColor ?? "#c25b00";
-  const showBands = Boolean(bandForecast);
+  const bandsVisible = bandSourceSeries ? isSeriesVisible(bandSourceSeries.dataKey) : false;
+  const showBands = Boolean(bandForecast) && bandsVisible;
   const intervalLevels = useMemo(
     () => bandForecast?.bounds?.map((b) => b.level)?.sort((a, b) => a - b) ?? [],
     [bandForecast],
@@ -183,7 +199,11 @@ export const ForecastChart = ({
       rangeKey: `range_${lvl}`,
     }));
   }, [bandForecast, intervalLevels, lowerBoundKey, showBands, upperBoundKey]);
-  const bandLevels = bandDescriptors.length ? bandDescriptors.map((band) => band.level) : intervalLevels;
+  const bandLevels = showBands
+    ? bandDescriptors.length
+      ? bandDescriptors.map((band) => band.level)
+      : intervalLevels
+    : [];
   const boundsMap = useMemo(() => {
     const map = new Map<number, { lower: number[]; upper: number[] }>();
     bandForecast?.bounds?.forEach((interval) =>
@@ -193,7 +213,7 @@ export const ForecastChart = ({
   }, [bandForecast]);
   const noiseId = useMemo(() => `chartNoise-${Math.random().toString(36).slice(2, 7)}`, []);
   const moduleBadge = primaryForecast
-    ? `${primaryForecast.config.module_type} / ${primaryForecast.config.model_type.toUpperCase()}`
+    ? formatModelName(primaryForecast.config.module_type, primaryForecast.config.model_type)
     : "Awaiting run";
   const testSplitBadge =
     primaryForecast?.config.test_size_fraction && primaryForecast.config.test_size_fraction > 0
@@ -213,7 +233,7 @@ export const ForecastChart = ({
     return map;
   }, [primaryForecast?.fitted]);
 
-  const data = useMemo<ChartPoint[]>(() => {
+  const { data, xLabelLookup } = useMemo(() => {
     const trainCount = history.length - testSet.length;
     const timestampsOrder: string[] = [];
     const pushTs = (ts: string) => {
@@ -253,8 +273,14 @@ export const ForecastChart = ({
       forecastMaps.set(series.dataKey, map);
     });
 
-    return sortedTimestamps.map((ts) => {
-      const point: ChartPoint = { ds: ts };
+    const labelLookup = new Map<number, string>();
+
+    const chartPoints = sortedTimestamps.map((ts, idx) => {
+      const tsValue = toDateValue(ts);
+      const xValue = Number.isFinite(tsValue) ? tsValue : idx;
+      labelLookup.set(xValue, ts);
+
+      const point: ChartPoint = { ds: ts, xValue };
       if (actualMap.has(ts)) point.actual = actualMap.get(ts);
       if (testActualMap.has(ts)) point.testActual = testActualMap.get(ts);
       if (fittedMap.has(ts)) point.trainPrediction = fittedMap.get(ts);
@@ -280,23 +306,49 @@ export const ForecastChart = ({
 
       return point;
     });
-  }, [
-    bandDescriptors,
-    bandForecast,
-    boundsMap,
-    forecastSeries,
-    fittedMap,
-    history,
-    testSet,
-  ]);
 
-  const isDimmed = (key: string) => focusedSeries !== null && focusedSeries !== key;
+    return { data: chartPoints, xLabelLookup: labelLookup };
+  }, [bandDescriptors, bandForecast, boundsMap, forecastSeries, fittedMap, history, testSet]);
+
+  const toggleOptions = useMemo(
+    () => [
+      { key: "train", label: "Train actuals", available: data.length > 0 },
+      { key: "test", label: "Test actuals", available: testSet.length > 0 },
+      { key: "fit", label: "Train fit", available: Boolean(primaryForecast?.fitted) },
+      ...forecastSeries.map((series) => ({
+        key: series.dataKey,
+        label: series.label,
+        available: true,
+      })),
+    ],
+    [data.length, forecastSeries, primaryForecast?.fitted, testSet.length],
+  );
+  useEffect(() => {
+    setVisibleSeries((prev) => {
+      const next = { ...prev };
+      let changed = false;
+      const keys = toggleOptions.filter((t) => t.available).map((t) => t.key);
+      keys.forEach((key) => {
+        if (next[key] === undefined) {
+          next[key] = true;
+          changed = true;
+        }
+      });
+      Object.keys(next).forEach((key) => {
+        if (!keys.includes(key)) {
+          delete next[key];
+          changed = true;
+        }
+      });
+      return changed ? next : prev;
+    });
+  }, [toggleOptions]);
   const colorSet = useMemo(() => {
     const trainStroke = "#222";
     const testStroke = warmColor ?? _secondaryColor ?? "#524b41";
     const fitStroke = "#8c7968";
     const bandBase =
-      bandSourceSeries?.color ?? focusedForecastSeries?.color ?? primaryStroke ?? "#c25b00";
+      bandSourceSeries?.color ?? primaryStroke ?? "#c25b00";
     const bandWash = hexToRgba(bandBase, 0.2);
     return {
       train: trainStroke,
@@ -305,7 +357,7 @@ export const ForecastChart = ({
       bandOutline: bandBase,
       bandWash,
     };
-  }, [bandSourceSeries?.color, focusedForecastSeries?.color, primaryStroke, warmColor, _secondaryColor]);
+  }, [bandSourceSeries?.color, primaryStroke, warmColor, _secondaryColor]);
   const bandFillFor = (level: number) => {
     // Make tighter intervals (e.g., 50%) slightly stronger than wide ones (e.g., 95%)
     // so they stay visible even when bands overlap.
@@ -318,8 +370,8 @@ export const ForecastChart = ({
       ["testActual", "Test"],
       ["trainPrediction", "Train fit"],
     ]);
-    forecastSeries.forEach((series, idx) => {
-      map.set(series.dataKey, `Forecast ${idx + 1}`);
+    forecastSeries.forEach((series) => {
+      map.set(series.dataKey, series.label);
     });
     bandDescriptors.forEach((band) => {
       map.set(band.rangeKey, `Band ${band.level}%`);
@@ -344,7 +396,7 @@ export const ForecastChart = ({
     return (
       <div className="rounded-md border border-slate-200 bg-white/95 px-3 py-2 text-sm shadow-md dark:border-slate-700 dark:bg-slate-900/95">
         <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-          {formatLabel(label)}
+          {formatLabel(typeof label === "number" ? xLabelLookup.get(label) ?? label : label)}
         </div>
         <div className="space-y-1">
           {deduped.map((entry) => {
@@ -375,23 +427,61 @@ export const ForecastChart = ({
     );
   };
   const handleMouseMove = (state: any) => {
+    const activeLabel = state?.activeLabel as number | undefined;
+    if (refAreaLeft !== null && typeof activeLabel === "number") {
+      setRefAreaRight(activeLabel);
+    }
     const point = state?.activePayload?.[0]?.payload as ChartPoint | undefined;
     const label = state?.activeLabel as string | number | undefined;
     if (!point || label === undefined || label === null) {
       setHoveredPoint(null);
       return;
     }
-    setHoveredPoint({ label, point });
+    const displayLabel =
+      typeof label === "number" ? xLabelLookup.get(label) ?? label : label;
+    setHoveredPoint({ label: displayLabel, point });
   };
+  const handleMouseDown = (state: any) => {
+    const label = state?.activeLabel;
+    if (typeof label !== "number") return;
+    setRefAreaLeft(label);
+    setRefAreaRight(label);
+  };
+  const handleMouseUp = () => {
+    if (refAreaLeft === null || refAreaRight === null) {
+      setRefAreaLeft(null);
+      setRefAreaRight(null);
+      return;
+    }
+    if (refAreaLeft === refAreaRight) {
+      setRefAreaLeft(null);
+      setRefAreaRight(null);
+      return;
+    }
+    const [from, to] = refAreaLeft < refAreaRight ? [refAreaLeft, refAreaRight] : [refAreaRight, refAreaLeft];
+    setLeft(from);
+    setRight(to);
+    setRefAreaLeft(null);
+    setRefAreaRight(null);
+  };
+  const resetZoom = () => {
+    setLeft("dataMin");
+    setRight("dataMax");
+    setRefAreaLeft(null);
+    setRefAreaRight(null);
+  };
+  const isZoomed = left !== "dataMin" || right !== "dataMax";
+  const formatXTick = (value: number | string) =>
+    typeof value === "number" ? formatLabel(xLabelLookup.get(value) ?? value) : formatLabel(value);
   const hudRows = useMemo(
     () => {
       if (!hoveredPoint?.point) return [];
       const point = hoveredPoint.point;
       const rows: { key: string; label: string; value: string; color?: string }[] = [];
-      if (typeof point.actual === "number") {
+      if (typeof point.actual === "number" && isSeriesVisible("train")) {
         rows.push({ key: "train", label: "Train", value: point.actual.toFixed(2), color: colorSet.train });
       }
-      if (typeof point.testActual === "number") {
+      if (typeof point.testActual === "number" && isSeriesVisible("test")) {
         rows.push({
           key: "test",
           label: "Test",
@@ -399,7 +489,7 @@ export const ForecastChart = ({
           color: colorSet.test,
         });
       }
-      if (typeof point.trainPrediction === "number") {
+      if (typeof point.trainPrediction === "number" && isSeriesVisible("fit")) {
         rows.push({
           key: "fit",
           label: "Train fit",
@@ -409,7 +499,7 @@ export const ForecastChart = ({
       }
       forecastSeries.forEach((series) => {
         const value = point[series.dataKey];
-        if (typeof value === "number") {
+        if (typeof value === "number" && isSeriesVisible(series.dataKey)) {
           rows.push({
             key: series.dataKey,
             label: series.label,
@@ -424,8 +514,27 @@ export const ForecastChart = ({
   );
   const hudLabel = hoveredPoint ? formatLabel(hoveredPoint.label) : null;
 
-  const strokeFor = (key: string, color: string) => (isDimmed(key) ? "#7d7368" : color);
-  const opacityFor = (key: string) => (isDimmed(key) ? 0.35 : 1);
+  const strokeFor = (key: string, color: string) => color;
+  const opacityFor = (key: string) => (isSeriesVisible(key) ? 1 : 0.25);
+  const isHidden = (key: string) => !isSeriesVisible(key);
+  const toggleSeriesVisibility = (key: string) =>
+    setVisibleSeries((prev) => {
+      const next = { ...prev };
+      const currentlyVisible = prev[key] !== false;
+      next[key] = !currentlyVisible;
+      return next;
+    });
+  const availableToggleKeys = toggleOptions.filter((t) => t.available).map((t) => t.key);
+  const toggleAllVisible = availableToggleKeys.some((key) => !isSeriesVisible(key));
+  const toggleAll = () => {
+    setVisibleSeries((prev) => {
+      const next = { ...prev };
+      availableToggleKeys.forEach((key) => {
+        next[key] = toggleAllVisible;
+      });
+      return next;
+    });
+  };
   const hasData = data.length > 0;
   const tickerItems = [
     { label: "Model", value: modelLabel ?? "-" },
@@ -436,9 +545,17 @@ export const ForecastChart = ({
   const showSkeleton = loading && history.length === 0 && forecastSeries.length === 0;
   const chartRevealKey = `${primarySeries?.dataKey ?? "chart"}-${data.length}-${loading ? "loading" : "ready"}`;
   const hoverSpring = { type: "spring", stiffness: 420, damping: 20 };
+  const referenceReady = refAreaLeft !== null && refAreaRight !== null;
+
+  useEffect(() => {
+    setLeft("dataMin");
+    setRight("dataMax");
+    setRefAreaLeft(null);
+    setRefAreaRight(null);
+  }, [chartRevealKey]);
 
   return (
-    <div className="timeline-card panel relative box-border h-[440px] overflow-hidden p-6" aria-busy={loading}>
+    <div className="timeline-card panel relative box-border min-h-[520px] p-6" aria-busy={loading}>
       {loading ? (
         <div className="scanline absolute inset-x-0 top-0 h-1 overflow-hidden rounded-t-xl bg-slate-200 dark:bg-slate-800/80">
           <div className="scanline-bar h-full w-1/3" />
@@ -475,6 +592,17 @@ export const ForecastChart = ({
               Bands: {bandLevels.join("% / ")}%
             </span>
           )}
+          <motion.button
+            type="button"
+            onClick={resetZoom}
+            disabled={!isZoomed}
+            whileHover={{ y: -2, scale: 1.01 }}
+            whileTap={{ scale: 0.99 }}
+            transition={hoverSpring}
+            className="pill border-indigo-200 bg-indigo-50 text-indigo-700 hover:border-indigo-300 hover:bg-indigo-100 dark:border-indigo-500/50 dark:bg-indigo-500/10 dark:text-indigo-100 dark:hover:border-indigo-400/70 dark:hover:bg-indigo-500/20 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            Reset Zoom
+          </motion.button>
         </div>
       </div>
 
@@ -492,36 +620,84 @@ export const ForecastChart = ({
         ))}
       </div>
 
-      <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
-        {[
-          { key: "train", label: "Train actuals", disabled: data.length === 0 },
-          { key: "test", label: "Test actuals", disabled: testSet.length === 0 },
-          ...forecastSeries.map((series) => ({
-            key: series.dataKey,
-            label: series.label,
-            disabled: false,
-          })),
-        ].map(({ key, label, disabled }) => {
-          const active = focusedSeries === key;
-          return (
-            <motion.button
-              key={key}
-              type="button"
-              disabled={disabled}
-              onClick={() => setFocusedSeries((prev) => (prev === key ? null : key))}
-              whileHover={{ y: -2, scale: 1.01 }}
-              whileTap={{ scale: 0.99 }}
-              transition={hoverSpring}
-              className={`rounded-full border px-3 py-1 font-semibold transition ${
-                active
-                  ? "border-[#c25b00] bg-[#f2e8de] text-[#c25b00] shadow-sm dark:border-indigo-500/70 dark:bg-indigo-500/10 dark:text-indigo-100"
-                  : "border-[#c0b2a3] bg-[var(--kaito-surface)] text-[#4a473f] hover:border-[#c25b00] dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200"
-              } disabled:cursor-not-allowed disabled:opacity-50`}
+      <div className="mt-3 rounded-xl border border-[#c0b2a3] bg-[var(--kaito-surface)]/60 p-3 shadow-sm shadow-black/5 dark:border-slate-800 dark:bg-slate-900/70 dark:shadow-none">
+        <button
+          type="button"
+          onClick={() => setControlsOpen((prev) => !prev)}
+          className="flex w-full items-center justify-between gap-3 rounded-lg px-2 py-1 text-xs font-semibold uppercase tracking-[0.06em] text-[#4a473f] transition hover:text-[#c25b00] dark:text-slate-200"
+        >
+          <span className="flex items-center gap-2">
+            <span className="h-1.5 w-1.5 rounded-full bg-[#c25b00]" />
+            Series controls
+          </span>
+          <span className="flex items-center gap-2 text-[11px] text-[#6a655b] dark:text-slate-400">
+            {controlsOpen ? "Hide" : "Show"}
+            <motion.span
+              animate={{ rotate: controlsOpen ? 180 : 0 }}
+              transition={{ duration: 0.25, ease: "easeInOut" }}
+              className="inline-block"
             >
-              {active ? `Focus: ${label}` : `Toggle ${label}`}
-            </motion.button>
-          );
-        })}
+              v
+            </motion.span>
+          </span>
+        </button>
+        <AnimatePresence initial={false}>
+          {controlsOpen ? (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.28, ease: "easeInOut" }}
+              className="overflow-hidden"
+            >
+              <div className="mt-2 space-y-3">
+                <div className="flex items-center justify-between gap-3 text-[11px] font-semibold uppercase tracking-[0.06em] text-[#6a655b] dark:text-slate-400">
+                  <span className="flex items-center gap-2">
+                    <span className="h-1 w-1 rounded-full bg-[#c25b00]" />
+                    Visibility
+                  </span>
+                  <motion.button
+                    type="button"
+                    onClick={toggleAll}
+                    disabled={availableToggleKeys.length === 0}
+                    whileHover={{ y: -2, scale: 1.01 }}
+                    whileTap={{ scale: 0.99 }}
+                    transition={hoverSpring}
+                    className="rounded-full border border-[#c0b2a3] bg-[var(--kaito-surface)] px-3 py-1 text-[11px] font-semibold text-[#4a473f] shadow-sm transition hover:border-[#c25b00] hover:text-[#c25b00] dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-indigo-400 dark:hover:text-indigo-100 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {toggleAllVisible ? "Show all" : "Hide all"}
+                  </motion.button>
+                </div>
+                <div className="max-h-40 space-y-2 overflow-y-auto pr-1">
+                  <div className="flex flex-wrap items-center gap-2 text-xs">
+                    {toggleOptions
+                      .filter((option) => option.available)
+                      .map(({ key, label }) => {
+                        const active = isSeriesVisible(key);
+                        return (
+                          <motion.button
+                            key={key}
+                            type="button"
+                            onClick={() => toggleSeriesVisibility(key)}
+                            whileHover={{ y: -2, scale: 1.01 }}
+                            whileTap={{ scale: 0.99 }}
+                            transition={hoverSpring}
+                            className={`rounded-full border px-3 py-1 font-semibold transition ${
+                              active
+                                ? "border-[#c25b00] bg-[#f2e8de] text-[#c25b00] shadow-sm dark:border-indigo-500/70 dark:bg-indigo-500/10 dark:text-indigo-100"
+                                : "border-[#c0b2a3] bg-[var(--kaito-surface)] text-[#7d7368] hover:border-[#c25b00] hover:text-[#c25b00] dark:border-slate-800 dark:bg-slate-900 dark:text-slate-500 dark:hover:border-indigo-400 dark:hover:text-indigo-100"
+                            }`}
+                          >
+                            {active ? `On: ${label}` : `Off: ${label}`}
+                          </motion.button>
+                        );
+                      })}
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          ) : null}
+        </AnimatePresence>
       </div>
 
       <div className="mt-3 flex flex-wrap items-center gap-4 text-xs text-slate-700 dark:text-slate-200">
@@ -558,14 +734,14 @@ export const ForecastChart = ({
                 className="h-2.5 w-2.5 rounded-full shadow-[0_0_0_4px_rgba(15,23,42,0.05)] dark:shadow-[0_0_0_4px_rgba(255,255,255,0.06)]"
                 style={{ backgroundColor: strokeFor(key, color), opacity: opacityFor(key) }}
               />
-              <span className={isDimmed(key) ? "text-slate-400 dark:text-slate-500" : ""}>
+              <span className={!isSeriesVisible(key) ? "text-slate-400 dark:text-slate-500" : ""}>
                 {label}
               </span>
             </div>
           ))}
       </div>
 
-      <div className="timeline-chart relative mt-4 box-border h-[300px] w-full pr-6">
+      <div className="timeline-chart relative mt-4 box-border min-h-[400px] w-full pr-6">
         {showSkeleton ? (
           <div className="chart-skeleton pointer-events-none absolute inset-0 z-10 rounded-xl">
             <div className="absolute inset-3 flex flex-col justify-between gap-4">
@@ -584,12 +760,18 @@ export const ForecastChart = ({
         ) : null}
         {hasData ? (
           <div className="relative h-full">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height={400}>
               <LineChart
                 data={data}
                 margin={{ top: 10, right: 24, left: 0, bottom: 40 }}
                 onMouseMove={handleMouseMove}
-                onMouseLeave={() => setHoveredPoint(null)}
+                onMouseDown={handleMouseDown}
+                onMouseUp={handleMouseUp}
+                onMouseLeave={() => {
+                  setHoveredPoint(null);
+                  setRefAreaLeft(null);
+                  setRefAreaRight(null);
+                }}
               >
                 <defs>
                   <linearGradient id="forecastGradient" x1="0" y1="0" x2="0" y2="1">
@@ -600,19 +782,29 @@ export const ForecastChart = ({
                 </defs>
                 <CartesianGrid strokeDasharray="4 4" stroke="#b0a899" strokeOpacity={0.45} />
                 <XAxis
-                  dataKey="ds"
-                  tickFormatter={formatLabel}
+                  dataKey="xValue"
+                  tickFormatter={formatXTick}
                   tick={{ fill: "#5c564d", fontSize: 11 }}
                   height={40}
                   allowDuplicatedCategory={false}
-                  type="category"
+                  type="number"
+                  domain={[left, right]}
                 />
                 <YAxis tick={{ fill: "#5c564d", fontSize: 11 }} />
                 <Tooltip
-                  labelFormatter={formatLabel}
+                  labelFormatter={(value) => formatXTick(value)}
                   content={renderTooltipContent}
                   cursor={{ stroke: "#a8a29e", strokeWidth: 1, strokeDasharray: "4 4" }}
                 />
+                {referenceReady ? (
+                  <ReferenceArea
+                    x1={refAreaLeft ?? undefined}
+                    x2={refAreaRight ?? undefined}
+                    strokeOpacity={0.8}
+                    fill={hexToRgba(primaryStroke, 0.25)}
+                    fillOpacity={0.3}
+                  />
+                ) : null}
                 {showBands
                   ? bandDescriptors.map((band, idx) => (
                       <Area
@@ -635,18 +827,19 @@ export const ForecastChart = ({
                     dataKey={primarySeries.dataKey}
                     stroke="none"
                     fill="url(#forecastGradient)"
-                    fillOpacity={isDimmed(primarySeries.dataKey) ? 0.25 : 0.65}
+                    hide={isHidden(primarySeries.dataKey)}
+                    fillOpacity={isSeriesVisible(primarySeries.dataKey) ? 0.65 : 0}
                     isAnimationActive={!loading}
                     animationDuration={1600}
                     animationEasing="ease-in-out"
                   />
                 ) : null}
                 <Brush
-                  dataKey="ds"
+                  dataKey="xValue"
                   height={24}
                   stroke="#c25b00"
                   travellerWidth={10}
-                  tickFormatter={formatLabel}
+                  tickFormatter={formatXTick}
                   fill="rgba(194,91,0,0.08)"
                 />
                 <Line
@@ -654,6 +847,7 @@ export const ForecastChart = ({
                   dataKey="actual"
                   stroke={strokeFor("train", colorSet.train)}
                   strokeOpacity={opacityFor("train")}
+                  hide={isHidden("train")}
                   strokeWidth={1.5}
                   dot={{
                     r: 4.5,
@@ -672,6 +866,7 @@ export const ForecastChart = ({
                   dataKey="testActual"
                   stroke={strokeFor("test", colorSet.test)}
                   strokeOpacity={opacityFor("test")}
+                  hide={isHidden("test")}
                   strokeWidth={1.5}
                   dot={{
                     strokeWidth: 1.3,
@@ -691,6 +886,7 @@ export const ForecastChart = ({
                   dataKey="trainPrediction"
                   stroke={strokeFor("fit", colorSet.fit)}
                   strokeOpacity={opacityFor("fit")}
+                  hide={isHidden("fit")}
                   strokeWidth={1.25}
                   dot={false}
                   name="Train fit"
@@ -707,6 +903,7 @@ export const ForecastChart = ({
                   dataKey={series.dataKey}
                   stroke={strokeFor(series.dataKey, series.color)}
                   strokeOpacity={opacityFor(series.dataKey)}
+                  hide={isHidden(series.dataKey)}
                   strokeWidth={series.dataKey === primaryDataKey ? 2.1 : 1.6}
                   dot={false}
                   name={series.label}

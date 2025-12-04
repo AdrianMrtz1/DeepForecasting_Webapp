@@ -56,12 +56,29 @@ const sanitizeConfig = (config: ForecastConfigState): ForecastConfigState => {
       ? "multi_step_recursive"
       : config.strategy;
 
+  const allowedMissing: ForecastConfigState["missing_strategy"][] = [
+    "none",
+    "drop",
+    "ffill",
+    "interpolate",
+  ];
+  const safeMissing: ForecastConfigState["missing_strategy"] = allowedMissing.includes(
+    config.missing_strategy as ForecastConfigState["missing_strategy"],
+  )
+    ? (config.missing_strategy as ForecastConfigState["missing_strategy"])
+    : "none";
+
   const fractionValue =
     typeof config.test_size_fraction === "number" ? config.test_size_fraction : Number.NaN;
   const safeFraction =
     Number.isFinite(fractionValue) && fractionValue >= 0 && fractionValue < 0.9
       ? Number(fractionValue)
       : null;
+
+  const normalizePositiveInt = (value?: number) =>
+    Number.isFinite(value) && value && value > 0 ? Math.round(value) : undefined;
+  const normalizeEarlyStopFraction = (value?: number | null) =>
+    Number.isFinite(value) && value && value > 0 && value < 0.5 ? Number(value) : undefined;
 
   const cleaned: ForecastConfigState = {
     ...config,
@@ -71,15 +88,17 @@ const sanitizeConfig = (config: ForecastConfigState): ForecastConfigState => {
     log_transform: Boolean(config.log_transform),
     test_size_fraction: safeFraction,
     detect_frequency: config.detect_frequency !== false,
-    missing_strategy: config.missing_strategy ?? "none",
+    missing_strategy: safeMissing,
     date_start: config.date_start ?? null,
     date_end: config.date_end ?? null,
+    early_stop_patience: normalizePositiveInt(config.early_stop_patience),
+    early_stop_validation_fraction: normalizeEarlyStopFraction(
+      config.early_stop_validation_fraction ?? null,
+    ),
   };
 
   const normalizeLayers = (value?: number) =>
     Number.isFinite(value) && (value === 1 || value === 2) ? value : undefined;
-  const normalizePositiveInt = (value?: number) =>
-    Number.isFinite(value) && value && value > 0 ? Math.round(value) : undefined;
 
   if (cleaned.module_type === "StatsForecast") {
     cleaned.lags = undefined;
@@ -99,6 +118,9 @@ const sanitizeConfig = (config: ForecastConfigState): ForecastConfigState => {
     cleaned.num_layers = normalizeLayers(cleaned.num_layers) ?? 1;
     cleaned.hidden_size = normalizePositiveInt(cleaned.hidden_size) ?? 16;
     cleaned.epochs = normalizePositiveInt(cleaned.epochs) ?? 20;
+    if (cleaned.early_stop_patience && !cleaned.early_stop_validation_fraction) {
+      cleaned.early_stop_validation_fraction = 0.2;
+    }
   }
 
   return cleaned;
@@ -455,6 +477,17 @@ export const useForecast = (initialConfig?: Partial<ForecastConfigState>) => {
           payload,
         );
         setBatchResult(data);
+        const stamp = Date.now();
+        const runs: ForecastRun[] =
+          data.results?.map((result, idx) => ({
+            ...result,
+            runId: createRunId(),
+            createdAt: stamp + idx,
+            durationMs: null,
+          })) ?? [];
+        if (runs.length) {
+          setForecastHistory((prev) => [...prev, ...runs]);
+        }
       } catch (err) {
         setError(resolveErrorMessage(err));
       } finally {

@@ -36,7 +36,7 @@ DeepForecasting_Webapp
 - Model breadth: StatsForecast (AutoARIMA/AutoETS/naive), MLForecast (LightGBM/XGBoost/CatBoost/RandomForest/Linear), NeuralForecast (MLP/RNN/LSTM/GRU).
 - Benchmarking: `/forecast/batch` runs multiple configs at once and returns a leaderboard.
 - Rolling backtests: `/backtest` performs multi-window evaluations with per-window and aggregate metrics.
-- Preprocessing: date filters, missing-value handling (drop/ffill/bfill/interpolate), optional log transform, holdout splits, cadence detection with overrides.
+- Preprocessing: date filters, missing-value handling (drop/ffill/interpolate), optional log transform, holdout splits, cadence detection with overrides.
 - Config persistence: `/configs` endpoints store named setups on disk; `/datasets` serves built-in samples with recommended defaults.
 
 ## Walkthrough

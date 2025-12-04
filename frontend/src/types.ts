@@ -20,10 +20,12 @@ export interface ForecastConfigState {
   num_layers?: number;
   hidden_size?: number;
   epochs?: number;
+  early_stop_patience?: number;
+  early_stop_validation_fraction?: number;
   log_transform?: boolean;
   test_size_fraction?: number | null;
    detect_frequency?: boolean;
-   missing_strategy?: "none" | "drop" | "ffill" | "bfill" | "interpolate";
+   missing_strategy?: "none" | "drop" | "ffill" | "interpolate";
    date_start?: string | null;
    date_end?: string | null;
 }

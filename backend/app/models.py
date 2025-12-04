@@ -36,7 +36,6 @@ class MissingStrategy(str, Enum):
     none = "none"
     drop = "drop"
     forward_fill = "ffill"
-    backward_fill = "bfill"
     interpolate = "interpolate"
 
 
@@ -115,6 +114,14 @@ class ForecastConfig(BaseModel):
     epochs: int | None = Field(
         default=None,
         description="Training epochs/steps for NeuralForecast models.",
+    )
+    early_stop_patience: int | None = Field(
+        default=None,
+        description="Patience/rounds for early stopping when supported by the model.",
+    )
+    early_stop_validation_fraction: float | None = Field(
+        default=None,
+        description="Fraction of training data reserved for validation when early stopping is enabled (0-0.5).",
     )
     level: list[int] = Field(
         default_factory=lambda: [80, 90],
@@ -226,6 +233,27 @@ class ForecastConfig(BaseModel):
         if epochs <= 0:
             raise ValueError("epochs must be greater than zero.")
         return epochs
+
+    @field_validator("early_stop_patience")
+    @classmethod
+    def validate_early_stop_patience(cls, patience: int | None) -> int | None:
+        """Ensure early stopping patience is positive when supplied."""
+        if patience is None:
+            return None
+        patience = int(patience)
+        if patience <= 0:
+            raise ValueError("early_stop_patience must be greater than zero.")
+        return patience
+
+    @field_validator("early_stop_validation_fraction")
+    @classmethod
+    def validate_early_stop_fraction(cls, fraction: float | None) -> float | None:
+        """Keep the validation holdout small but positive when provided."""
+        if fraction is None:
+            return None
+        if fraction <= 0 or fraction >= 0.5:
+            raise ValueError("early_stop_validation_fraction must be between 0 and 0.5.")
+        return float(fraction)
 
     @field_validator("level")
     @classmethod

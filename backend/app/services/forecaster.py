@@ -556,7 +556,7 @@ class NixtlaService:
         df = train_df.copy()
         df["unique_id"] = "series"
 
-        model = self._build_ml_model(config.model_type)
+        model = self._build_ml_model(config)
         fit_kwargs = {"max_horizon": config.horizon} if config.strategy == Strategy.multi_output_direct else {}
         try:
             forecaster = MLForecast(
@@ -570,9 +570,11 @@ class NixtlaService:
         except Exception as exc:
             raise ValueError(f"MLForecast {config.model_type} forecast failed: {exc}") from exc
 
-    def _build_ml_model(self, model_type: str):
+    def _build_ml_model(self, config: ForecastConfig):
         """Map config names to MLForecast regressors with safe defaults."""
-        name = model_type.lower()
+        name = config.model_type.lower()
+        patience = config.early_stop_patience
+        val_fraction = config.early_stop_validation_fraction or 0.1
 
         if name == "linear":
             from sklearn.linear_model import LinearRegression
@@ -608,11 +610,15 @@ class NixtlaService:
             except ImportError as exc:  # pragma: no cover - optional dependency path
                 raise ImportError("Install lightgbm to use the lightgbm model.") from exc
 
-            return LGBMRegressor(
-                n_estimators=400,
-                learning_rate=0.05,
-                subsample=0.8,
-            )
+            params = {
+                "n_estimators": 400,
+                "learning_rate": 0.05,
+                "subsample": 0.8,
+            }
+            if patience:
+                params["n_iter_no_change"] = patience
+                params["validation_fraction"] = val_fraction
+            return LGBMRegressor(**params)
 
         if name == "catboost":
             try:
@@ -620,15 +626,20 @@ class NixtlaService:
             except ImportError as exc:  # pragma: no cover - optional dependency path
                 raise ImportError("Install catboost to use the catboost model.") from exc
 
-            return CatBoostRegressor(
-                depth=8,
-                learning_rate=0.05,
-                loss_function="RMSE",
-                iterations=500,
-                verbose=False,
-            )
+            params = {
+                "depth": 8,
+                "learning_rate": 0.05,
+                "loss_function": "RMSE",
+                "iterations": 500,
+                "verbose": False,
+            }
+            if patience:
+                params["od_type"] = "Iter"
+                params["od_wait"] = patience
+                params["use_best_model"] = False
+            return CatBoostRegressor(**params)
 
-        raise NotImplementedError(f"Unknown MLForecast model '{model_type}'.")
+        raise NotImplementedError(f"Unknown MLForecast model '{config.model_type}'.")
 
     def _forecast_neuralforecast(
         self, train_df: pd.DataFrame, config: ForecastConfig
@@ -691,6 +702,13 @@ class NixtlaService:
         common_kwargs = {"h": config.horizon, "input_size": input_size, "loss": mae_cls()}
         if epochs is not None:
             common_kwargs["max_steps"] = epochs
+        if config.early_stop_patience is not None:
+            common_kwargs["early_stop_patience_steps"] = config.early_stop_patience
+            common_kwargs["valid_size"] = (
+                config.early_stop_validation_fraction
+                if config.early_stop_validation_fraction is not None
+                else 0.2
+            )
 
         if name == "mlp":
             if layers is not None:

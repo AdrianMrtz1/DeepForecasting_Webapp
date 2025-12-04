@@ -1,16 +1,9 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import type React from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 
-import {
-  Activity,
-  AlertCircle,
-  BrainCircuit,
-  CheckCircle2,
-  Download,
-  Info,
-  Loader2,
-} from "lucide-react";
+import { AlertCircle, BrainCircuit, CheckCircle2, Download, Info, Loader2 } from "lucide-react";
 
 import { ConfigPanel } from "./components/ConfigPanel";
 import { FileUpload } from "./components/FileUpload";
@@ -22,7 +15,9 @@ import { TopKpiRow } from "./components/TopKpiRow";
 import { RevealText } from "./components/ui/Reveal";
 import { useForecast } from "./hooks/useForecast";
 import { useRunForecast } from "./hooks/useRunForecast";
-import type { ForecastConfigState, ForecastRun } from "./types";
+import { MODEL_OPTIONS } from "./constants/models";
+import { cleanModelName, formatModelName } from "./utils/modelNames";
+import type { ForecastConfigState, ForecastRun, ModuleType } from "./types";
 
 
 
@@ -171,6 +166,13 @@ const mapForecastRows = (forecast: ForecastRun | null) => {
 
 
 
+const getMetricClass = (value: number | null | undefined, minVal: number) => {
+  if (value === null || value === undefined) return "";
+  return Math.abs(value - minVal) < 0.0001
+    ? "bg-yellow-100 font-bold text-yellow-900 dark:bg-yellow-500/20 dark:text-yellow-200 rounded px-1"
+    : "";
+};
+
 const resolveInitialTheme = () => {
 
   return false;
@@ -277,23 +279,49 @@ export const App = () => {
 
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
 
-  const lastLeaderboardKey = useRef<string | null>(null);
+  const leaderboardRunIds = useRef<Set<string>>(new Set());
 
-  const [selectedBenchmarks, setSelectedBenchmarks] = useState<Record<string, boolean>>({
+  const [sidebarWidth, setSidebarWidth] = useState(320);
+  const [isRunningFullAnalysis, setIsRunningFullAnalysis] = useState(false);
 
-    auto_arima: true,
-
-    auto_ets: true,
-
-    lightgbm: true,
-
-    gru: false,
-
+  const [selectedBenchmarks, setSelectedBenchmarks] = useState<Record<string, boolean>>(() => {
+    const defaults: Record<string, boolean> = {};
+    (Object.entries(MODEL_OPTIONS) as [ModuleType, readonly string[]][]).forEach(
+      ([module, models]) => {
+        models.forEach((model) => {
+          defaults[`${module}-${model}`] = true;
+        });
+      },
+    );
+    return defaults;
   });
 
   const [backtestWindows, setBacktestWindows] = useState<number>(3);
 
   const [backtestStep, setBacktestStep] = useState<number>(1);
+
+  const startResizing = useCallback(
+    (mouseDownEvent: React.MouseEvent) => {
+      mouseDownEvent.preventDefault();
+      const startX = mouseDownEvent.clientX;
+      const startWidth = sidebarWidth;
+
+      const doDrag = (mouseMoveEvent: MouseEvent) => {
+        setSidebarWidth(Math.max(260, Math.min(600, startWidth + mouseMoveEvent.clientX - startX)));
+      };
+
+      const stopDrag = () => {
+        document.documentElement.removeEventListener("mousemove", doDrag);
+        document.documentElement.removeEventListener("mouseup", stopDrag);
+        document.body.style.cursor = "default";
+      };
+
+      document.documentElement.addEventListener("mousemove", doDrag);
+      document.documentElement.addEventListener("mouseup", stopDrag);
+      document.body.style.cursor = "col-resize";
+    },
+    [sidebarWidth],
+  );
 
 
 
@@ -351,126 +379,89 @@ export const App = () => {
 
   }, [history, trainTest]);
 
-  const benchmarkOptions = useMemo(
+  const benchmarkOptions = useMemo(() => {
+    const helperText: Record<string, string> = {
+      "StatsForecast.auto_arima": "Automatic ARIMA search.",
+      "StatsForecast.auto_ets": "ETS tuned smoothing.",
+      "StatsForecast.seasonal_naive": "Seasonal naive anchor.",
+      "StatsForecast.random_walk_with_drift": "Random walk with drift baseline.",
+      "MLForecast.lightgbm": "Tree model with lagged regressors.",
+      "MLForecast.xgboost": "Boosted trees with lags.",
+      "MLForecast.linear": "Linear regressor with lag stack.",
+      "NeuralForecast.gru": "Recurrent baseline.",
+      "NeuralForecast.lstm": "LSTM recurrent net.",
+      "NeuralForecast.mlp": "Feed-forward net.",
+      "NeuralForecast.rnn": "Vanilla RNN baseline.",
+    };
 
-    () => [
-
-      {
-
-        key: "auto_arima",
-
-        label: "AutoARIMA",
-
-        helper: "StatsForecast automatic ARIMA search.",
-
-        config: {
-
+    const buildConfigFor = (module: ModuleType, model: string): ForecastConfigState => {
+      if (module === "StatsForecast") {
+        return {
           ...config,
-
-          module_type: "StatsForecast" as const,
-
-          model_type: "auto_arima",
-
+          module_type: module,
+          model_type: model,
           strategy: "multi_step_recursive" as const,
-
-        },
-
-      },
-
-      {
-
-        key: "auto_ets",
-
-        label: "AutoETS",
-
-        helper: "StatsForecast exponential smoothing.",
-
-        config: {
-
+        };
+      }
+      if (module === "MLForecast") {
+        return {
           ...config,
-
-          module_type: "StatsForecast" as const,
-
-          model_type: "auto_ets",
-
-          strategy: "multi_step_recursive" as const,
-
-        },
-
-      },
-
-      {
-
-        key: "lightgbm",
-
-        label: "LightGBM",
-
-        helper: "MLForecast tree model with common lags.",
-
-        config: {
-
-          ...config,
-
-          module_type: "MLForecast" as const,
-
-          model_type: "lightgbm",
-
+          module_type: module,
+          model_type: model,
           lags: config.lags?.length ? config.lags : [1, 7, Math.max(1, config.season_length)],
-
           strategy: "multi_output_direct" as const,
-
-        },
-
-      },
-
-      {
-
-        key: "gru",
-
-        label: "GRU",
-
-        helper: "NeuralForecast recurrent baseline.",
-
-        config: {
-
+        };
+      }
+      if (module === "NeuralForecast") {
+        return {
           ...config,
-
-          module_type: "NeuralForecast" as const,
-
-          model_type: "gru",
-
+          module_type: module,
+          model_type: model,
           input_size: config.input_size ?? Math.max(4, config.season_length),
-
           num_layers: config.num_layers ?? 1,
-
           hidden_size: config.hidden_size ?? 32,
-
           epochs: config.epochs ?? 50,
-
           strategy: "multi_step_recursive" as const,
+        };
+      }
+      return { ...config, module_type: module, model_type: model };
+    };
 
-        },
+    const options: {
+      key: string;
+      label: string;
+      helper: string;
+      config: ForecastConfigState;
+      module: ModuleType;
+      model: string;
+    }[] = [];
 
-      },
+    (Object.keys(MODEL_OPTIONS) as ModuleType[]).forEach((module) => {
+      MODEL_OPTIONS[module].forEach((model) => {
+        const key = `${module}-${model}`;
+        const label = cleanModelName(model);
+        const helperKey = `${module}.${model}`;
+        const helper =
+          helperText[helperKey] ??
+          helperText[model] ??
+          `${label} candidate from ${module}.`;
+        options.push({
+          key,
+          label,
+          helper,
+          config: buildConfigFor(module, model),
+          module,
+          model,
+        });
+      });
+    });
 
-    ],
-
-    [config],
-
-  );
+    return options;
+  }, [config]);
 
   const activeBenchmarkConfigs = useMemo(
-
-    () =>
-
-      benchmarkOptions
-
-        .filter((opt) => selectedBenchmarks[opt.key])
-
-        .map((opt) => opt.config),
-
+    () => benchmarkOptions.filter((opt) => selectedBenchmarks[opt.key]).map((opt) => opt.config),
     [benchmarkOptions, selectedBenchmarks],
-
   );
 
   const hasDataLoaded = useMemo(() => rows > 0 || (history?.length ?? 0) > 0, [history, rows]);
@@ -487,32 +478,29 @@ export const App = () => {
 
   };
 
-  const handleBenchmarkRun = () => {
+  const handleRunFullAnalysis = async () => {
+    const candidates = activeBenchmarkConfigs.length
+      ? activeBenchmarkConfigs
+      : benchmarkOptions.map((opt) => opt.config);
 
-    if (!activeBenchmarkConfigs.length) {
-
-      alert("Select at least one model to benchmark.");
-
+    if (!candidates.length) {
+      alert("Select at least one model to analyze.");
       return;
-
     }
 
-    runBenchmark(activeBenchmarkConfigs);
-
-  };
-
-  const handleBacktestRun = () => {
-
-    if (!activeBenchmarkConfigs.length) {
-
-      alert("Select at least one model to backtest.");
-
+    if (!hasDataLoaded) {
+      alert("Load data before running the leaderboard analysis.");
       return;
-
     }
 
-    runBacktest(activeBenchmarkConfigs, backtestWindows, backtestStep);
-
+    setIsRunningFullAnalysis(true);
+    setTableTab("leaderboard");
+    try {
+      await runBenchmark(candidates);
+      await runBacktest(candidates, backtestWindows, backtestStep);
+    } finally {
+      setIsRunningFullAnalysis(false);
+    }
   };
 
   const handleSaveConfig = async () => {
@@ -620,61 +608,40 @@ export const App = () => {
   );
 
   useEffect(() => {
+    if (!forecastHistory.length) return;
 
-    if (!latestForecast) return;
+    const newEntries: LeaderboardEntry[] = [];
 
-    const key =
-
-      latestForecast.runId ||
-
-      `${latestForecast.config.module_type}-${latestForecast.config.model_type}-${latestForecast.timestamps?.[0] ?? ""}-${latestForecast.forecast?.length ?? 0}`;
-
-    if (lastLeaderboardKey.current === key) return;
-
-    lastLeaderboardKey.current = key;
-
-    const createdAt = latestForecast.createdAt ?? Date.now();
-
-    setLeaderboard((prev) => [
-
-      ...prev,
-
-      {
-
+    forecastHistory.forEach((run) => {
+      const key =
+        run.runId ||
+        `${run.config.module_type}-${run.config.model_type}-${run.timestamps?.[0] ?? ""}-${run.forecast?.length ?? 0}`;
+      if (leaderboardRunIds.current.has(key)) return;
+      leaderboardRunIds.current.add(key);
+      const createdAt = run.createdAt ?? Date.now();
+      newEntries.push({
         id: `${createdAt}-${key}`,
-
-        model: latestForecast.config.model_type.toUpperCase(),
-
-        module: latestForecast.config.module_type,
-
-        rmse: latestForecast.metrics?.rmse,
-
-        mae: latestForecast.metrics?.mae,
-
-        mape: latestForecast.metrics?.mape,
-
-        duration: latestForecast.durationMs ?? lastRunMs ?? null,
-
-        settings: latestForecast.config,
-
+        model: formatModelName(run.config.module_type, run.config.model_type),
+        module: run.config.module_type,
+        rmse: run.metrics?.rmse,
+        mae: run.metrics?.mae,
+        mape: run.metrics?.mape,
+        duration: run.durationMs ?? null,
+        settings: run.config,
         createdAt,
+      });
+    });
 
-      },
-
-    ]);
-
-  }, [latestForecast, lastRunMs]);
+    if (newEntries.length) {
+      setLeaderboard((prev) => [...prev, ...newEntries]);
+    }
+  }, [forecastHistory]);
 
   useEffect(() => {
-
     if (forecastHistory.length === 0) {
-
       setLeaderboard([]);
-
-      lastLeaderboardKey.current = null;
-
+      leaderboardRunIds.current.clear();
     }
-
   }, [forecastHistory.length]);
 
   const leaderboardRows = useMemo(() => {
@@ -705,6 +672,59 @@ export const App = () => {
 
   }, [leaderboard]);
 
+  const leaderboardMins = useMemo(() => {
+    const rmseVals = leaderboardRows
+      .map((row) => row.rmse)
+      .filter((val): val is number => val !== null && val !== undefined && !Number.isNaN(val));
+    const maeVals = leaderboardRows
+      .map((row) => row.mae)
+      .filter((val): val is number => val !== null && val !== undefined && !Number.isNaN(val));
+    const mapeVals = leaderboardRows
+      .map((row) => row.mape)
+      .filter((val): val is number => val !== null && val !== undefined && !Number.isNaN(val));
+    return {
+      rmse: rmseVals.length ? Math.min(...rmseVals) : Number.POSITIVE_INFINITY,
+      mae: maeVals.length ? Math.min(...maeVals) : Number.POSITIVE_INFINITY,
+      mape: mapeVals.length ? Math.min(...mapeVals) : Number.POSITIVE_INFINITY,
+    };
+  }, [leaderboardRows]);
+
+  const batchLeaderboardMins = useMemo(() => {
+    const rows = batchResult?.leaderboard ?? [];
+    const rmseVals = rows
+      .map((row) => row.metrics.rmse)
+      .filter((val): val is number => val !== null && val !== undefined && !Number.isNaN(val));
+    const maeVals = rows
+      .map((row) => row.metrics.mae)
+      .filter((val): val is number => val !== null && val !== undefined && !Number.isNaN(val));
+    const mapeVals = rows
+      .map((row) => row.metrics.mape)
+      .filter((val): val is number => val !== null && val !== undefined && !Number.isNaN(val));
+    return {
+      rmse: rmseVals.length ? Math.min(...rmseVals) : Number.POSITIVE_INFINITY,
+      mae: maeVals.length ? Math.min(...maeVals) : Number.POSITIVE_INFINITY,
+      mape: mapeVals.length ? Math.min(...mapeVals) : Number.POSITIVE_INFINITY,
+    };
+  }, [batchResult]);
+
+  const backtestAggregateMins = useMemo(() => {
+    const rows = backtestResult?.results ?? [];
+    const rmseVals = rows
+      .map((row) => row.aggregate.rmse)
+      .filter((val): val is number => val !== null && val !== undefined && !Number.isNaN(val));
+    const maeVals = rows
+      .map((row) => row.aggregate.mae)
+      .filter((val): val is number => val !== null && val !== undefined && !Number.isNaN(val));
+    const mapeVals = rows
+      .map((row) => row.aggregate.mape)
+      .filter((val): val is number => val !== null && val !== undefined && !Number.isNaN(val));
+    return {
+      rmse: rmseVals.length ? Math.min(...rmseVals) : Number.POSITIVE_INFINITY,
+      mae: maeVals.length ? Math.min(...maeVals) : Number.POSITIVE_INFINITY,
+      mape: mapeVals.length ? Math.min(...mapeVals) : Number.POSITIVE_INFINITY,
+    };
+  }, [backtestResult]);
+
 
 
   const handleLoadLeaderboardConfig = (entry: LeaderboardEntry) => {
@@ -725,6 +745,7 @@ export const App = () => {
     ? forecastRows.intervals
     : latestForecast?.config.level ?? config.level ?? [];
 
+  const analysisIsLoading = isRunningFullAnalysis || loading === "benchmark" || loading === "backtest";
 
 
   const hoverSpring = { type: "spring", stiffness: 400, damping: 17 };
@@ -737,7 +758,13 @@ export const App = () => {
           variants={itemVariants}
           custom={0}
           transition={{ layout: { duration: 0.6, ease: fluidEase } }}
-          className="w-full h-screen flex-shrink-0 overflow-y-auto border-b border-[var(--kaito-border)] bg-[var(--kaito-subtle)] px-5 py-6 shadow-[0_10px_24px_rgba(0,0,0,0.04)] no-scrollbar lg:h-full lg:w-80 lg:min-w-[320px] lg:flex-shrink-0 lg:border-b-0 lg:border-r lg:shadow-[12px_0_30px_rgba(0,0,0,0.04)] dark:border-slate-800 dark:bg-slate-900/40"
+          style={{
+            width: `${sidebarWidth}px`,
+            minWidth: "260px",
+            maxWidth: "min(600px, 100%)",
+            flexBasis: `${sidebarWidth}px`,
+          }}
+          className="relative w-full h-screen flex-shrink-0 overflow-y-auto border-b border-[var(--kaito-border)] bg-[var(--kaito-subtle)] px-5 py-6 shadow-[0_10px_24px_rgba(0,0,0,0.04)] no-scrollbar lg:h-full lg:flex-shrink-0 lg:border-b-0 lg:border-r lg:shadow-[12px_0_30px_rgba(0,0,0,0.04)] dark:border-slate-800 dark:bg-slate-900/40"
         >
             <Link to="/" className="group flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#1f1c19] font-semibold text-white shadow-sm shadow-black/20 transition group-hover:translate-y-[-2px] group-hover:shadow-lg">
@@ -787,10 +814,16 @@ export const App = () => {
                   running={loading === "forecast" || isRunPending}
                   dataReady={hasDataLoaded}
                   detectedFreq={detectedFreq ?? selectedDataset?.freq ?? null}
-                  disabled={loading === "upload" || isRunPending}
+              disabled={loading === "upload" || isRunPending}
                 />
               </motion.div>
             </motion.div>
+            <div
+              role="separator"
+              aria-orientation="vertical"
+              onMouseDown={startResizing}
+              className="absolute right-0 top-0 h-full w-1 cursor-col-resize rounded-r-lg bg-transparent transition hover:bg-indigo-500/50"
+            />
           </motion.aside>
 
         <motion.main
@@ -852,7 +885,18 @@ export const App = () => {
                   </motion.div>
                 )}
 
-                <motion.div variants={itemVariants} layout custom={0.2}>
+                <motion.div
+                  variants={itemVariants}
+                  layout
+                  custom={0.2}
+                  key={`chart-${forecastHistory.length}-${batchResult?.results?.length ?? 0}`}
+                  initial={{ opacity: 0.85 }}
+                  animate={{ opacity: forecastHistory.length ? 1 : 0.95 }}
+                  transition={{
+                    layout: { duration: 0.6, ease: fluidEase },
+                    opacity: { duration: 0.6, ease: "easeOut" },
+                  }}
+                >
                   <ForecastChart
                     history={history}
                     forecasts={forecastHistory}
@@ -863,8 +907,8 @@ export const App = () => {
                     metrics={latestForecast?.metrics}
                     modelLabel={
                       latestForecast
-                        ? latestForecast.config.model_type.toUpperCase()
-                        : config.model_type.toUpperCase()
+                        ? formatModelName(latestForecast.config.module_type, latestForecast.config.model_type)
+                        : formatModelName(config.module_type, config.model_type)
                     }
                     runDurationMs={latestForecast?.durationMs ?? lastRunMs}
                     loading={loading === "forecast"}
@@ -898,7 +942,13 @@ export const App = () => {
                           {latestForecast ? (
                             <>
                               <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-                              <span>Using {latestForecast.config.model_type.toUpperCase()}</span>
+                              <span>
+                                Using{" "}
+                                {formatModelName(
+                                  latestForecast.config.module_type,
+                                  latestForecast.config.model_type,
+                                )}
+                              </span>
                             </>
                           ) : (
                             <>
@@ -958,7 +1008,7 @@ export const App = () => {
 
                       {tableTab === "forecast" ? (
                         <>
-                          <div className="mt-3">
+                          <div className="mt-3 max-h-[500px] overflow-y-auto scroll-smooth">
                             {forecastTableRows.length ? (
                               <ForecastDataTable data={forecastTableRows} intervals={intervalColumns} />
                             ) : (
@@ -989,7 +1039,7 @@ export const App = () => {
                           </div>
                         </>
                       ) : (
-                        <div className="mt-3 rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900/60">
+                        <div className="mt-3 max-h-[500px] overflow-y-auto scroll-smooth rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900/60">
                           {leaderboardRows.length ? (
                             <table className="min-w-full text-sm">
                               <thead className="bg-slate-100 text-left text-slate-600 dark:bg-slate-900 dark:text-slate-400">
@@ -1021,19 +1071,25 @@ export const App = () => {
                                         View
                                       </span>
                                     </td>
-                                    <td className="px-3 py-2 text-right font-mono">
+                                    <td
+                                      className={`px-3 py-2 text-right font-mono ${getMetricClass(row.rmse, leaderboardMins.rmse)}`}
+                                    >
                                       {row.rmse !== null && row.rmse !== undefined && !Number.isNaN(row.rmse)
-                                        ? row.rmse.toFixed(3)
+                                        ? row.rmse.toFixed(2)
                                         : "-"}
                                     </td>
-                                    <td className="px-3 py-2 text-right font-mono">
+                                    <td
+                                      className={`px-3 py-2 text-right font-mono ${getMetricClass(row.mae, leaderboardMins.mae)}`}
+                                    >
                                       {row.mae !== null && row.mae !== undefined && !Number.isNaN(row.mae)
-                                        ? row.mae.toFixed(3)
+                                        ? row.mae.toFixed(2)
                                         : "-"}
                                     </td>
-                                    <td className="px-3 py-2 text-right font-mono">
+                                    <td
+                                      className={`px-3 py-2 text-right font-mono ${getMetricClass(row.mape, leaderboardMins.mape)}`}
+                                    >
                                       {row.mape !== null && row.mape !== undefined && !Number.isNaN(row.mape)
-                                        ? row.mape.toFixed(3)
+                                        ? row.mape.toFixed(2)
                                         : "-"}
                                     </td>
                                     <td className="px-3 py-2 text-right font-mono">
@@ -1074,35 +1130,19 @@ export const App = () => {
                           </motion.button>
                           <motion.button
                             type="button"
-                            onClick={handleBenchmarkRun}
-                            disabled={!hasDataLoaded || loading === "benchmark"}
+                            onClick={handleRunFullAnalysis}
+                            disabled={!hasDataLoaded || analysisIsLoading}
                             whileHover={{ y: -2, scale: 1.01 }}
                             whileTap={{ scale: 0.99 }}
                             transition={hoverSpring}
                             className="inline-flex items-center gap-2 rounded-full border border-[var(--kaito-border)] px-4 py-2 text-sm font-semibold uppercase tracking-[0.04em] text-[var(--kaito-ink)] transition hover:shadow-[0_10px_24px_rgba(0,0,0,0.06)] disabled:cursor-not-allowed disabled:opacity-60"
                           >
-                            {loading === "benchmark" ? (
+                            {analysisIsLoading ? (
                               <Loader2 className="h-4 w-4 animate-spin" />
                             ) : (
                               <BrainCircuit className="h-4 w-4" />
                             )}
-                            Run benchmark
-                          </motion.button>
-                          <motion.button
-                            type="button"
-                            onClick={handleBacktestRun}
-                            disabled={!hasDataLoaded || loading === "backtest"}
-                            whileHover={{ y: -2, scale: 1.01 }}
-                            whileTap={{ scale: 0.99 }}
-                            transition={hoverSpring}
-                            className="inline-flex items-center gap-2 rounded-full border border-[var(--kaito-border)] px-4 py-2 text-sm font-semibold uppercase tracking-[0.04em] text-[var(--kaito-ink)] transition hover:shadow-[0_10px_24px_rgba(0,0,0,0.06)] disabled:cursor-not-allowed disabled:opacity-60"
-                          >
-                            {loading === "backtest" ? (
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : (
-                              <Activity className="h-4 w-4" />
-                            )}
-                            Backtest
+                            Run Leaderboard Analysis
                           </motion.button>
                         </div>
                       </div>
@@ -1192,11 +1232,39 @@ export const App = () => {
                               <tbody className="divide-y divide-[var(--kaito-border)] text-[var(--kaito-ink)] dark:divide-slate-700 dark:text-slate-100">
                                 {batchResult.leaderboard.map((row) => (
                                   <tr key={`${row.model_label}-${row.config.model_type}`}>
-                                    <td className="px-2 py-1 font-semibold">{row.model_label}</td>
-                                    <td className="px-2 py-1 text-[var(--kaito-muted)] dark:text-slate-300">{row.module_type}</td>
-                                    <td className="px-2 py-1 text-right font-mono">{row.metrics.rmse ?? "-"}</td>
-                                    <td className="px-2 py-1 text-right font-mono">{row.metrics.mae ?? "-"}</td>
-                                    <td className="px-2 py-1 text-right font-mono">{row.metrics.mape ?? "-"}</td>
+                                    <td className="px-2 py-1 font-semibold">
+                                      {cleanModelName(row.config.model_type)}
+                                    </td>
+                                    <td className="px-2 py-1 text-[var(--kaito-muted)] dark:text-slate-300">
+                                      {row.module_type}
+                                    </td>
+                                    <td
+                                      className={`px-2 py-1 text-right font-mono ${getMetricClass(row.metrics.rmse, batchLeaderboardMins.rmse)}`}
+                                    >
+                                      {row.metrics.rmse !== null &&
+                                      row.metrics.rmse !== undefined &&
+                                      !Number.isNaN(row.metrics.rmse as number)
+                                        ? Number(row.metrics.rmse).toFixed(2)
+                                        : "-"}
+                                    </td>
+                                    <td
+                                      className={`px-2 py-1 text-right font-mono ${getMetricClass(row.metrics.mae, batchLeaderboardMins.mae)}`}
+                                    >
+                                      {row.metrics.mae !== null &&
+                                      row.metrics.mae !== undefined &&
+                                      !Number.isNaN(row.metrics.mae as number)
+                                        ? Number(row.metrics.mae).toFixed(2)
+                                        : "-"}
+                                    </td>
+                                    <td
+                                      className={`px-2 py-1 text-right font-mono ${getMetricClass(row.metrics.mape, batchLeaderboardMins.mape)}`}
+                                    >
+                                      {row.metrics.mape !== null &&
+                                      row.metrics.mape !== undefined &&
+                                      !Number.isNaN(row.metrics.mape as number)
+                                        ? Number(row.metrics.mape).toFixed(2)
+                                        : "-"}
+                                    </td>
                                   </tr>
                                 ))}
                               </tbody>
@@ -1228,11 +1296,35 @@ export const App = () => {
                                 {backtestResult.results.map((row) => (
                                   <tr key={`${row.config.model_type}-${row.config.module_type}`}>
                                     <td className="px-2 py-1 font-semibold">
-                                      {row.config.module_type}/{row.config.model_type}
+                                      {cleanModelName(row.config.model_type)}
                                     </td>
-                                    <td className="px-2 py-1 text-right font-mono">{row.aggregate.rmse ?? "-"}</td>
-                                    <td className="px-2 py-1 text-right font-mono">{row.aggregate.mae ?? "-"}</td>
-                                    <td className="px-2 py-1 text-right font-mono">{row.aggregate.mape ?? "-"}</td>
+                                    <td
+                                      className={`px-2 py-1 text-right font-mono ${getMetricClass(row.aggregate.rmse, backtestAggregateMins.rmse)}`}
+                                    >
+                                      {row.aggregate.rmse !== null &&
+                                      row.aggregate.rmse !== undefined &&
+                                      !Number.isNaN(row.aggregate.rmse as number)
+                                        ? Number(row.aggregate.rmse).toFixed(2)
+                                        : "-"}
+                                    </td>
+                                    <td
+                                      className={`px-2 py-1 text-right font-mono ${getMetricClass(row.aggregate.mae, backtestAggregateMins.mae)}`}
+                                    >
+                                      {row.aggregate.mae !== null &&
+                                      row.aggregate.mae !== undefined &&
+                                      !Number.isNaN(row.aggregate.mae as number)
+                                        ? Number(row.aggregate.mae).toFixed(2)
+                                        : "-"}
+                                    </td>
+                                    <td
+                                      className={`px-2 py-1 text-right font-mono ${getMetricClass(row.aggregate.mape, backtestAggregateMins.mape)}`}
+                                    >
+                                      {row.aggregate.mape !== null &&
+                                      row.aggregate.mape !== undefined &&
+                                      !Number.isNaN(row.aggregate.mape as number)
+                                        ? Number(row.aggregate.mape).toFixed(2)
+                                        : "-"}
+                                    </td>
                                     <td className="px-2 py-1 text-right font-mono">{row.windows.length}</td>
                                   </tr>
                                 ))}

@@ -295,8 +295,6 @@ def apply_missing_strategy(df: pd.DataFrame, strategy: str) -> pd.DataFrame:
         return df.dropna(subset=["y"]).reset_index(drop=True)
     if strategy == "ffill":
         return df.ffill().reset_index(drop=True)
-    if strategy == "bfill":
-        return df.bfill().reset_index(drop=True)
     if strategy == "interpolate":
         filled = df.copy()
         filled["y"] = filled["y"].interpolate(limit_direction="both")

@@ -126,6 +126,10 @@ export const ConfigPanel = ({
     const num = Number(value);
     return Number.isFinite(num) && num > 0 ? num : undefined;
   };
+  const normalizeFraction = (value: string) => {
+    const num = Number(value);
+    return Number.isFinite(num) && num > 0 && num < 0.5 ? num : undefined;
+  };
 
   const toggleLevel = (level: number) => {
     const exists = config.level.includes(level);
@@ -364,7 +368,6 @@ export const ConfigPanel = ({
                 <option value="none">Leave as-is</option>
                 <option value="drop">Drop missing</option>
                 <option value="ffill">Forward fill</option>
-                <option value="bfill">Backward fill</option>
                 <option value="interpolate">Interpolate</option>
               </select>
               <p className="mt-1 text-xs text-slate-600 dark:text-slate-300">
@@ -547,6 +550,65 @@ export const ConfigPanel = ({
                   </div>
                   <p className="mt-1 text-xs text-slate-600 dark:text-slate-300">
                     Confidence bands are available for StatsForecast runs.
+                  </p>
+                </div>
+              )}
+
+              {(showMlHyperparams || showNeuralHyperparams) && (
+                <div className="panel-subtle p-3">
+                  <div className="flex items-center justify-between text-sm font-semibold text-slate-800 dark:text-slate-100">
+                    <span>Early stopping</span>
+                    <span className="text-xs text-slate-500 dark:text-slate-400">optional</span>
+                  </div>
+                  <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <div>
+                      <label
+                        className="text-xs font-semibold text-slate-700 dark:text-slate-200"
+                        htmlFor="early-stop-patience-input"
+                      >
+                        Patience (rounds/steps)
+                      </label>
+                      <input
+                        id="early-stop-patience-input"
+                        type="number"
+                        min={1}
+                        className="mt-1 w-full rounded-[4px] border border-slate-300 bg-slate-50 px-3 py-2 text-slate-900 focus:border-indigo-400 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                        value={config.early_stop_patience ?? ""}
+                        onChange={(e) =>
+                          onChange({ early_stop_patience: normalizePositive(e.target.value) })
+                        }
+                        placeholder="e.g. 10"
+                        disabled={disabled}
+                      />
+                    </div>
+                    <div>
+                      <label
+                        className="text-xs font-semibold text-slate-700 dark:text-slate-200"
+                        htmlFor="early-stop-fraction-input"
+                      >
+                        Validation fraction
+                      </label>
+                      <input
+                        id="early-stop-fraction-input"
+                        type="number"
+                        min={0}
+                        max={0.49}
+                        step={0.05}
+                        className="mt-1 w-full rounded-[4px] border border-slate-300 bg-slate-50 px-3 py-2 text-slate-900 focus:border-indigo-400 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                        value={config.early_stop_validation_fraction ?? ""}
+                        onChange={(e) =>
+                          onChange({
+                            early_stop_validation_fraction: normalizeFraction(e.target.value),
+                          })
+                        }
+                        placeholder="e.g. 0.2"
+                        disabled={disabled}
+                      />
+                    </div>
+                  </div>
+                  <p className="mt-2 text-xs text-slate-600 dark:text-slate-300">
+                    Applies to NeuralForecast models and ML boosters (LightGBM/CatBoost). Leave blank
+                    to disable; a small validation slice (e.g. 0.2) is used when patience is set.
                   </p>
                 </div>
               )}

@@ -15,6 +15,34 @@ def build_sample_df() -> pd.DataFrame:
     values = [1, 2, 3, 4, 5, 6]
     return pd.DataFrame({"ds": dates, "y": values})
 
+
+@pytest.mark.parametrize("model_type", ["window_average", "seasonal_window_average"])
+def test_window_average_models_skip_fitted_and_intervals(model_type: str) -> None:
+    periods = 12 if model_type == "seasonal_window_average" else 6
+    df = pd.DataFrame(
+        {
+            "ds": pd.date_range("2024-01-01", periods=periods, freq="D"),
+            "y": np.arange(1, periods + 1),
+        }
+    )
+    config = ForecastConfig(
+        module_type=ModuleType.statsforecast,
+        model_type=model_type,
+        strategy=Strategy.multi_step_recursive,
+        freq="D",
+        season_length=3,
+        horizon=2,
+        level=[80],
+    )
+
+    service = NixtlaService(api_key=None)
+    response = service.forecast(df, config)
+
+    assert response.fitted is None
+    assert response.bounds == []
+    expected_len = service._determine_test_size(len(df), config) + config.horizon
+    assert len(response.forecast) == expected_len
+
 def test_forecast_includes_fitted_predictions_when_available() -> None:
     df = build_sample_df()
     config = ForecastConfig(
