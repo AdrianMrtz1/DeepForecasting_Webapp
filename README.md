@@ -78,7 +78,7 @@ Typical user workflow
 cd backend
 python -m venv .venv
 .\.venv\Scripts\activate          # on Windows
-pip install -r requirements.txt
+pip install -r ../requirements.txt
 # Python 3.13: install neuralforecast manually -> pip install --no-deps neuralforecast==3.1.2
 cp .env.example .env
 uvicorn app.main:app --reload --port 9000

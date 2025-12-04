@@ -15,7 +15,7 @@ React + FastAPI lab: upload a CSV, map \`ds\`/\`y\`, and run StatsForecast, MLFo
 - Data contract: single time-series with \`ds\` (timestamp) and \`y\` (numeric)
 
 ## Quickstart
-1. Backend: \`cd backend && python -m venv .venv && ./.venv/Scripts/activate && pip install -r requirements.txt\`
+1. Backend: \`cd backend && python -m venv .venv && ./.venv/Scripts/activate && pip install -r ../requirements.txt\`
 2. Copy env: \`cp .env.example .env\`, then run \`uvicorn app.main:app --reload --port 9000\`
 3. Frontend: \`cd frontend && npm install && npm run dev\` (expects API at http://localhost:9000 or set \`VITE_API_BASE_URL\`)
 
