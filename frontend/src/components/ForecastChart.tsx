@@ -207,7 +207,7 @@ export const ForecastChart = ({
     const mapped = new Map<number, number>();
     spreads.forEach(({ lvl, spread }) => {
       const normalized = clamp(spread / maxSpread, 0, 1);
-      const opacity = 0.2 + (1 - normalized) * 0.45;
+      const opacity = 0.4 + (1 - normalized) * 0.45;
       mapped.set(lvl, Number(opacity.toFixed(3)));
     });
     return mapped;
@@ -320,15 +320,21 @@ export const ForecastChart = ({
     const fitStroke = "#8c7968";
     const bandBase =
       bandSourceSeries?.color ?? focusedForecastSeries?.color ?? primaryStroke ?? "#c25b00";
+    const bandWash = hexToRgba(bandBase, 0.25);
     return {
       train: trainStroke,
       test: testStroke,
       fit: fitStroke,
       bandOutline: bandBase,
+      bandWash,
     };
   }, [bandSourceSeries?.color, focusedForecastSeries?.color, primaryStroke, warmColor, _secondaryColor]);
-  const bandFillFor = (level: number) =>
-    hexToRgba(colorSet.bandOutline, clamp((bandOpacityByLevel.get(level) ?? 0.35) + 0.1, 0.2, 0.6));
+  const bandFillFor = (level: number) => {
+    const baseOpacity = bandOpacityByLevel.get(level);
+    if (baseOpacity === undefined) return colorSet.bandWash;
+    const alpha = clamp(baseOpacity + 0.05, 0.25, 0.85);
+    return hexToRgba(colorSet.bandOutline, alpha);
+  };
   const tooltipNameMap = useMemo(() => {
     const map = new Map<string, string>([
       ["actual", "Train"],
@@ -647,8 +653,8 @@ export const ForecastChart = ({
                 ) : null}
                 {showBands
                   ? bandDescriptors.map((band, idx) => {
-                      const baseOpacity = bandOpacityByLevel.get(band.level) ?? 0.3;
-                      const boostedOpacity = Math.min(0.35, Math.max(0.22, baseOpacity));
+                      const baseOpacity = bandOpacityByLevel.get(band.level) ?? 0.55;
+                      const boostedOpacity = clamp(baseOpacity, 0.45, 0.75);
                       return (
                         <Area
                           key={`band-${band.level}-${band.rangeKey}`}
@@ -658,11 +664,12 @@ export const ForecastChart = ({
                           strokeOpacity={0.9}
                           strokeWidth={3.2}
                           fill={bandFillFor(band.level)}
-                          fillOpacity={Math.min(0.9, boostedOpacity + 0.25)}
+                          fillOpacity={Math.min(0.95, boostedOpacity + 0.15)}
                           isAnimationActive={!loading}
                           animationDuration={1600 + idx * 140}
                           animationEasing="ease-in-out"
                           legendType="none"
+                          connectNulls
                         />
                       );
                     })
