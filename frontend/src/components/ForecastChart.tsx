@@ -12,7 +12,6 @@ import {
   Tooltip,
   XAxis,
   YAxis,
-  ReferenceLine,
 } from "recharts";
 
 import { fluidEase } from "./PageWrapper";
@@ -100,7 +99,7 @@ type ConfidenceBand = {
 };
 
 const formatMetric = (value?: number | null) =>
-  value === null || value === undefined || Number.isNaN(value) ? "-" : value.toFixed(3);
+  value === null || value === undefined || Number.isNaN(value) ? "-" : value.toFixed(2);
 
 export const ForecastChart = ({
   history = [],
@@ -213,10 +212,6 @@ export const ForecastChart = ({
     });
     return mapped;
   }, [bandDescriptors, boundsMap]);
-  const hatchId = useMemo(
-    () => `diagonalHatch-${Math.random().toString(36).slice(2, 7)}`,
-    [],
-  );
   const noiseId = useMemo(() => `chartNoise-${Math.random().toString(36).slice(2, 7)}`, []);
   const moduleBadge = primaryForecast
     ? `${primaryForecast.config.module_type} / ${primaryForecast.config.model_type.toUpperCase()}`
@@ -325,15 +320,77 @@ export const ForecastChart = ({
     const fitStroke = "#8c7968";
     const bandBase =
       bandSourceSeries?.color ?? focusedForecastSeries?.color ?? primaryStroke ?? "#c25b00";
-    const bandWash = hexToRgba(bandBase, 0.08);
     return {
       train: trainStroke,
       test: testStroke,
       fit: fitStroke,
       bandOutline: bandBase,
-      bandWash,
     };
   }, [bandSourceSeries?.color, focusedForecastSeries?.color, primaryStroke, warmColor, _secondaryColor]);
+  const bandFillFor = (level: number) =>
+    hexToRgba(colorSet.bandOutline, clamp((bandOpacityByLevel.get(level) ?? 0.35) + 0.1, 0.2, 0.6));
+  const tooltipNameMap = useMemo(() => {
+    const map = new Map<string, string>([
+      ["actual", "Train"],
+      ["testActual", "Test"],
+      ["trainPrediction", "Train fit"],
+    ]);
+    forecastSeries.forEach((series, idx) => {
+      map.set(series.dataKey, `Forecast ${idx + 1}`);
+    });
+    bandDescriptors.forEach((band) => {
+      map.set(band.rangeKey, `Band ${band.level}%`);
+    });
+    return map;
+  }, [forecastSeries, bandDescriptors]);
+  const renderTooltipContent = (props: any) => {
+    const { active, payload, label } = props;
+    if (!active || !payload?.length) return null;
+
+    // Keep the last occurrence of each dataKey to avoid duplicates (e.g., line + area of same series).
+    const seen = new Set<string>();
+    const deduped: any[] = [];
+    for (let i = payload.length - 1; i >= 0; i -= 1) {
+      const item = payload[i];
+      const key = (item?.dataKey ?? item?.name) as string;
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+      deduped.unshift(item);
+    }
+
+    return (
+      <div className="rounded-md border border-slate-200 bg-white/95 px-3 py-2 text-sm shadow-md dark:border-slate-700 dark:bg-slate-900/95">
+        <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+          {formatLabel(label)}
+        </div>
+        <div className="space-y-1">
+          {deduped.map((entry) => {
+            const key = (entry?.dataKey ?? entry?.name) as string;
+            const display = tooltipNameMap.get(key) ?? key;
+            const val = Array.isArray(entry?.value)
+              ? entry.value
+                  .map((v: any) => (typeof v === "number" ? v.toFixed(2) : v))
+                  .join(" - ")
+              : typeof entry?.value === "number"
+                ? entry.value.toFixed(2)
+                : entry?.value;
+            return (
+              <div key={key} className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <span
+                    className="h-2.5 w-2.5 rounded-full"
+                    style={{ backgroundColor: entry?.color ?? "#888" }}
+                  />
+                  <span className="text-xs text-slate-600 dark:text-slate-300">{display}</span>
+                </div>
+                <span className="font-mono text-xs text-slate-800 dark:text-slate-100">{val}</span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
   const handleMouseMove = (state: any) => {
     const point = state?.activePayload?.[0]?.payload as ChartPoint | undefined;
     const label = state?.activeLabel as string | number | undefined;
@@ -349,13 +406,13 @@ export const ForecastChart = ({
       const point = hoveredPoint.point;
       const rows: { key: string; label: string; value: string; color?: string }[] = [];
       if (typeof point.actual === "number") {
-        rows.push({ key: "train", label: "Train", value: point.actual.toFixed(3), color: colorSet.train });
+        rows.push({ key: "train", label: "Train", value: point.actual.toFixed(2), color: colorSet.train });
       }
       if (typeof point.testActual === "number") {
         rows.push({
           key: "test",
           label: "Test",
-          value: point.testActual.toFixed(3),
+          value: point.testActual.toFixed(2),
           color: colorSet.test,
         });
       }
@@ -363,7 +420,7 @@ export const ForecastChart = ({
         rows.push({
           key: "fit",
           label: "Train fit",
-          value: point.trainPrediction.toFixed(3),
+          value: point.trainPrediction.toFixed(2),
           color: colorSet.fit,
         });
       }
@@ -373,7 +430,7 @@ export const ForecastChart = ({
           rows.push({
             key: series.dataKey,
             label: series.label,
-            value: value.toFixed(3),
+            value: value.toFixed(2),
             color: series.color,
           });
         }
@@ -382,7 +439,6 @@ export const ForecastChart = ({
     },
     [hoveredPoint, forecastSeries, colorSet],
   );
-  const crosshairX = hoveredPoint?.label ?? null;
   const hudLabel = hoveredPoint ? formatLabel(hoveredPoint.label) : null;
 
   const strokeFor = (key: string, color: string) => (isDimmed(key) ? "#7d7368" : color);
@@ -551,7 +607,7 @@ export const ForecastChart = ({
             <ResponsiveContainer width="100%" height="100%">
               <LineChart
                 data={data}
-                margin={{ top: 10, right: 24, left: 0, bottom: 0 }}
+                margin={{ top: 10, right: 24, left: 0, bottom: 40 }}
                 onMouseMove={handleMouseMove}
                 onMouseLeave={() => setHoveredPoint(null)}
               >
@@ -561,13 +617,6 @@ export const ForecastChart = ({
                     <stop offset="50%" stopColor={primaryStroke} stopOpacity={0.12} />
                     <stop offset="100%" stopColor={primaryStroke} stopOpacity={0} />
                   </linearGradient>
-                  <pattern id={hatchId} patternUnits="userSpaceOnUse" width="4" height="4">
-                    <rect width="4" height="4" fill={colorSet.bandWash} />
-                    <path
-                      d="M-1,1 l2,-2 M0,4 l4,-4 M3,5 l2,-2"
-                      style={{ stroke: colorSet.bandOutline, strokeWidth: 0.5, opacity: 0.3 }}
-                    />
-                  </pattern>
                 </defs>
                 <CartesianGrid strokeDasharray="4 4" stroke="#b0a899" strokeOpacity={0.45} />
                 <XAxis
@@ -581,8 +630,8 @@ export const ForecastChart = ({
                 <YAxis tick={{ fill: "#5c564d", fontSize: 11 }} />
                 <Tooltip
                   labelFormatter={formatLabel}
-                  content={() => null}
-                  cursor={false}
+                  content={renderTooltipContent}
+                  cursor={{ stroke: "#a8a29e", strokeWidth: 1, strokeDasharray: "4 4" }}
                 />
                 {primarySeries ? (
                   <Area
@@ -605,12 +654,11 @@ export const ForecastChart = ({
                           key={`band-${band.level}-${band.rangeKey}`}
                           type="monotone"
                           dataKey={band.rangeKey}
-                          isRange
                           stroke={colorSet.bandOutline}
-                          strokeOpacity={1}
+                          strokeOpacity={0.9}
                           strokeWidth={3.2}
-                          fill={`url(#${hatchId})`}
-                          fillOpacity={Math.min(0.65, boostedOpacity + 0.1)}
+                          fill={bandFillFor(band.level)}
+                          fillOpacity={Math.min(0.9, boostedOpacity + 0.25)}
                           isAnimationActive={!loading}
                           animationDuration={1600 + idx * 140}
                           animationEasing="ease-in-out"
@@ -619,16 +667,6 @@ export const ForecastChart = ({
                       );
                     })
                   : null}
-                {crosshairX ? (
-                  <ReferenceLine
-                    x={crosshairX}
-                    stroke="#1f1c19"
-                    strokeOpacity={0.38}
-                    strokeDasharray="3 2"
-                    strokeWidth={1.25}
-                    isFront
-                  />
-                ) : null}
                 <Brush
                   dataKey="ds"
                   height={24}
