@@ -87,11 +87,18 @@ class NixtlaService:
         train_df, holdout_df, holdout_actuals = self._train_test_split(
             model_df, holdout_size, raw_df=df
         )
+        last_train_value = (
+            self._last_finite_value(train_df["y"]) if not train_df.empty else None
+        )
 
         if config_obj.strategy == Strategy.one_step and holdout_df is not None:
             forecast_df, resolved_model, rolling_train = self._one_step_forecast(
                 train_df, holdout_df, run_config
             )
+            if rolling_train is not None and not rolling_train.empty:
+                last_train_value = (
+                    self._last_finite_value(rolling_train["y"]) or last_train_value
+                )
             # After stepping through the holdout with actuals, extend the forecast
             # into the future so the UI sees both the test slice and the user horizon.
             remaining_horizon = max(adjusted_horizon - len(forecast_df), 0)
@@ -106,10 +113,16 @@ class NixtlaService:
         model_column = self._resolve_model_column(forecast_df, resolved_model)
 
         forecast_df = self._drop_non_finite_rows(
-            forecast_df, model_column, run_config.level, required=True
+            forecast_df,
+            model_column,
+            run_config.level,
+            required=True,
+            fallback_value=last_train_value,
         )
         if fitted_df is not None:
-            fitted_df = self._drop_non_finite_rows(fitted_df, model_column, run_config.level)
+            fitted_df = self._drop_non_finite_rows(
+                fitted_df, model_column, run_config.level, fallback_value=last_train_value
+            )
 
         if run_config.log_transform:
             forecast_df = self._invert_log_transform_forecast(
@@ -207,10 +220,19 @@ class NixtlaService:
                 holdout_actuals = df.iloc[test_start:test_end].reset_index(drop=True)
                 if holdout_df.empty or len(train_df) < 2:
                     continue
+                fallback_value = (
+                    self._last_finite_value(train_df["y"]) if not train_df.empty else None
+                )
 
                 run_cfg = cfg.model_copy(update={"horizon": len(holdout_df)})
                 if run_cfg.strategy == Strategy.one_step:
-                    fcst_df, resolved_model, _ = self._one_step_forecast(train_df, holdout_df, run_cfg)
+                    fcst_df, resolved_model, rolling_train = self._one_step_forecast(
+                        train_df, holdout_df, run_cfg
+                    )
+                    if rolling_train is not None and not rolling_train.empty:
+                        fallback_value = (
+                            self._last_finite_value(rolling_train["y"]) or fallback_value
+                        )
                     fitted_df = None
                 else:
                     fcst_df, resolved_model, fitted_df = self._run_forecast(train_df, run_cfg)
@@ -218,7 +240,11 @@ class NixtlaService:
 
                 model_column = self._resolve_model_column(fcst_df, resolved_model)
                 fcst_df = self._drop_non_finite_rows(
-                    fcst_df, model_column, run_cfg.level, required=True
+                    fcst_df,
+                    model_column,
+                    run_cfg.level,
+                    required=True,
+                    fallback_value=fallback_value,
                 )
 
                 if run_cfg.log_transform:
@@ -442,19 +468,23 @@ class NixtlaService:
         sf_df["unique_id"] = "series"
 
         model = self._build_statsforecast_model(config)
+        # Window average variants in StatsForecast do not implement fitted values or intervals.
+        supports_fitted = config.model_type not in {"window_average", "seasonal_window_average"}
+        level = config.level if supports_fitted else None
         try:
             sf = StatsForecast(models=[model], freq=config.freq, n_jobs=1)
             forecast_df = sf.forecast(
                 df=sf_df,
                 h=config.horizon,
-                level=config.level,
-                fitted=True,
+                level=level,
+                fitted=supports_fitted,
             )
             fitted_values: pd.DataFrame | None = None
-            try:
-                fitted_values = sf.forecast_fitted_values()
-            except Exception:
-                fitted_values = None
+            if supports_fitted:
+                try:
+                    fitted_values = sf.forecast_fitted_values()
+                except Exception:
+                    fitted_values = None
             resolved_model = getattr(model, "alias", config.model_type)
             return forecast_df, resolved_model, fitted_values
         except Exception as exc:
@@ -824,9 +854,12 @@ class NixtlaService:
         levels: Iterable[int],
         *,
         required: bool = False,
+        fallback_value: float | None = None,
     ) -> pd.DataFrame:
         """
         Remove rows where the forecast or bounds contain NaN/inf to keep JSON serializable outputs.
+        If no finite rows remain and `fallback_value` is provided, return a constant forecast
+        instead of failing so the UI can still render results.
         """
         if df.empty:
             if required:
@@ -847,9 +880,34 @@ class NixtlaService:
             mask &= np.isfinite(df[col])
 
         cleaned = df.loc[mask].reset_index(drop=True)
-        if cleaned.empty and required:
-            raise ValueError("Forecast contained no finite predictions.")
-        return cleaned
+        if not cleaned.empty or not required:
+            return cleaned
+
+        candidate = fallback_value
+        if (candidate is None or not np.isfinite(candidate)) and model_column in df.columns:
+            candidate = self._last_finite_value(df[model_column])
+
+        if candidate is not None and np.isfinite(candidate):
+            logger.warning(
+                "Forecast contained non-finite predictions; falling back to constant value for %s",
+                model_column,
+            )
+            fallback_df = pd.DataFrame()
+            if "ds" in df.columns:
+                fallback_df["ds"] = df["ds"].reset_index(drop=True)
+            fallback_df[model_column] = candidate
+            return fallback_df.reset_index(drop=True)
+
+        raise ValueError("Forecast contained no finite predictions.")
+
+    @staticmethod
+    def _last_finite_value(series: pd.Series) -> float | None:
+        """Return the last finite value in a series, if available."""
+        numeric = pd.to_numeric(series, errors="coerce")
+        finite = numeric[np.isfinite(numeric)]
+        if finite.empty:
+            return None
+        return float(finite.iloc[-1])
 
     def _compute_metrics(
         self, y_true: Iterable[float], y_pred: Iterable[float]
