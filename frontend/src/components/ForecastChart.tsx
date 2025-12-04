@@ -41,15 +41,15 @@ type ChartPoint = {
   trainPrediction?: number;
 } & Record<string, number | [number, number] | string | undefined>;
 
-const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
-
 const toDateValue = (value: string) => {
   const t = new Date(value).getTime();
   return Number.isFinite(t) ? t : Number.NaN;
 };
 
 const hexToRgba = (hex: string, alpha: number) => {
-  if (!hex) return `rgba(52, 211, 153, ${alpha})`;
+  if (!hex || !/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(hex)) {
+    return `rgba(52, 211, 153, ${alpha})`;
+  }
   const normalized = hex.replace("#", "");
   const value =
     normalized.length === 3
@@ -58,7 +58,7 @@ const hexToRgba = (hex: string, alpha: number) => {
           .map((c) => c + c)
           .join("")
       : normalized;
-  const int = parseInt(value.slice(0, 6), 16);
+  const int = parseInt(value, 16);
   if (Number.isNaN(int)) return `rgba(52, 211, 153, ${alpha})`;
   const r = (int >> 16) & 255;
   const g = (int >> 8) & 255;
@@ -158,10 +158,7 @@ export const ForecastChart = ({
       : latestStatsForecastSeries;
   const bandForecast = bandSourceSeries?.run ?? null;
   const primaryStroke = primarySeries?.color ?? _accentColor ?? "#c25b00";
-  const confidenceAvailable =
-    bandForecast?.config.module_type === "StatsForecast" &&
-    (bandForecast.bounds?.length ?? 0) > 0;
-  const showBands = Boolean(confidenceAvailable && bandSourceSeries);
+  const showBands = Boolean(bandForecast);
   const intervalLevels = useMemo(
     () => bandForecast?.bounds?.map((b) => b.level)?.sort((a, b) => a - b) ?? [],
     [bandForecast],
@@ -194,24 +191,6 @@ export const ForecastChart = ({
     );
     return map;
   }, [bandForecast]);
-  const bandOpacityByLevel = useMemo(() => {
-    if (!bandDescriptors.length) return new Map<number, number>();
-    const spreads = bandDescriptors.map((band) => {
-      const bounds = boundsMap.get(band.level);
-      if (!bounds) return { lvl: band.level, spread: 0.1 };
-      const widths = bounds.upper.map((value, idx) => Math.abs(value - bounds.lower[idx]));
-      const spread = widths.length ? widths.reduce((sum, v) => sum + v, 0) / widths.length : 0.1;
-      return { lvl: band.level, spread };
-    });
-    const maxSpread = spreads.reduce((max, item) => Math.max(max, item.spread), 0.1);
-    const mapped = new Map<number, number>();
-    spreads.forEach(({ lvl, spread }) => {
-      const normalized = clamp(spread / maxSpread, 0, 1);
-      const opacity = 0.4 + (1 - normalized) * 0.45;
-      mapped.set(lvl, Number(opacity.toFixed(3)));
-    });
-    return mapped;
-  }, [bandDescriptors, boundsMap]);
   const noiseId = useMemo(() => `chartNoise-${Math.random().toString(36).slice(2, 7)}`, []);
   const moduleBadge = primaryForecast
     ? `${primaryForecast.config.module_type} / ${primaryForecast.config.model_type.toUpperCase()}`
@@ -293,8 +272,6 @@ export const ForecastChart = ({
             if (bounds) {
               const lower = bounds.lower[tsIdx];
               const upper = bounds.upper[tsIdx];
-              point[band.lowerKey] = lower;
-              point[band.upperKey] = upper;
               point[band.rangeKey] = [lower, upper];
             }
           });
@@ -320,7 +297,7 @@ export const ForecastChart = ({
     const fitStroke = "#8c7968";
     const bandBase =
       bandSourceSeries?.color ?? focusedForecastSeries?.color ?? primaryStroke ?? "#c25b00";
-    const bandWash = hexToRgba(bandBase, 0.25);
+    const bandWash = hexToRgba(bandBase, 0.2);
     return {
       train: trainStroke,
       test: testStroke,
@@ -330,10 +307,10 @@ export const ForecastChart = ({
     };
   }, [bandSourceSeries?.color, focusedForecastSeries?.color, primaryStroke, warmColor, _secondaryColor]);
   const bandFillFor = (level: number) => {
-    const baseOpacity = bandOpacityByLevel.get(level);
-    if (baseOpacity === undefined) return colorSet.bandWash;
-    const alpha = clamp(baseOpacity + 0.05, 0.25, 0.85);
-    return hexToRgba(colorSet.bandOutline, alpha);
+    // Make tighter intervals (e.g., 50%) slightly stronger than wide ones (e.g., 95%)
+    // so they stay visible even when bands overlap.
+    const opacity = level < 80 ? 0.45 : 0.3;
+    return hexToRgba(colorSet.bandOutline, opacity);
   };
   const tooltipNameMap = useMemo(() => {
     const map = new Map<string, string>([
@@ -451,7 +428,7 @@ export const ForecastChart = ({
   const opacityFor = (key: string) => (isDimmed(key) ? 0.35 : 1);
   const hasData = data.length > 0;
   const tickerItems = [
-    { label: "Model", value: modelLabel ?? moduleBadge },
+    { label: "Model", value: modelLabel ?? "-" },
     { label: "MAE", value: formatMetric(metrics?.mae) },
     { label: "RMSE", value: formatMetric(metrics?.rmse) },
     { label: "Time", value: runDurationMs ? `${(runDurationMs / 1000).toFixed(1)}s` : "-" },
@@ -495,7 +472,7 @@ export const ForecastChart = ({
           )}
           {bandLevels.length > 0 && (
             <span className="pill border-amber-300 bg-amber-50 text-amber-700 shadow-sm shadow-amber-500/10 dark:border-amber-400/60 dark:bg-amber-500/10 dark:text-amber-100">
-              Bands: {bandLevels.join("% / ")}% (focus to show)
+              Bands: {bandLevels.join("% / ")}%
             </span>
           )}
         </div>
@@ -546,9 +523,6 @@ export const ForecastChart = ({
           );
         })}
       </div>
-      <p className="mt-1 text-[11px] text-[#6a655b] dark:text-slate-400">
-        Click a forecast to focus and reveal bold confidence bands; drag the mini-map below to zoom the timeline.
-      </p>
 
       <div className="mt-3 flex flex-wrap items-center gap-4 text-xs text-slate-700 dark:text-slate-200">
         {[
@@ -639,6 +613,22 @@ export const ForecastChart = ({
                   content={renderTooltipContent}
                   cursor={{ stroke: "#a8a29e", strokeWidth: 1, strokeDasharray: "4 4" }}
                 />
+                {showBands
+                  ? bandDescriptors.map((band, idx) => (
+                      <Area
+                        key={`band-${band.level}-${band.rangeKey}`}
+                        type="monotone"
+                        dataKey={band.rangeKey}
+                        stroke="none"
+                        fill={bandFillFor(band.level)}
+                        isAnimationActive={!loading}
+                        animationDuration={1600 + idx * 140}
+                        animationEasing="ease-in-out"
+                        legendType="none"
+                        connectNulls
+                      />
+                    ))
+                  : null}
                 {primarySeries ? (
                   <Area
                     type="monotone"
@@ -651,29 +641,6 @@ export const ForecastChart = ({
                     animationEasing="ease-in-out"
                   />
                 ) : null}
-                {showBands
-                  ? bandDescriptors.map((band, idx) => {
-                      const baseOpacity = bandOpacityByLevel.get(band.level) ?? 0.55;
-                      const boostedOpacity = clamp(baseOpacity, 0.45, 0.75);
-                      return (
-                        <Area
-                          key={`band-${band.level}-${band.rangeKey}`}
-                          type="monotone"
-                          dataKey={band.rangeKey}
-                          stroke={colorSet.bandOutline}
-                          strokeOpacity={0.9}
-                          strokeWidth={3.2}
-                          fill={bandFillFor(band.level)}
-                          fillOpacity={Math.min(0.95, boostedOpacity + 0.15)}
-                          isAnimationActive={!loading}
-                          animationDuration={1600 + idx * 140}
-                          animationEasing="ease-in-out"
-                          legendType="none"
-                          connectNulls
-                        />
-                      );
-                    })
-                  : null}
                 <Brush
                   dataKey="ds"
                   height={24}
