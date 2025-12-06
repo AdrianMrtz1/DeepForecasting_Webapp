@@ -2,7 +2,6 @@ import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-route
 import { AnimatePresence, motion } from "framer-motion";
 
 import { Layout } from "./components/Layout";
-import { TransitionCurtain } from "./components/TransitionCurtain";
 import { Home } from "./pages/Home";
 import { Notes } from "./pages/Notes";
 
@@ -17,7 +16,6 @@ const RoutedViews = () => {
     // before the new component mounts (curtain revealing).
     <AnimatePresence mode="wait">
       <motion.div key={location.pathname} className="relative">
-        <TransitionCurtain />
         <motion.div
           // Entrance: Fade in slightly delayed so it appears behind the lifting curtain
           initial={{ opacity: 0 }}

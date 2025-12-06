@@ -3,6 +3,7 @@ import ReactMarkdown, { type Components } from "react-markdown";
 import { motion } from "framer-motion";
 
 import { PageWrapper, itemVariants } from "../components/PageWrapper";
+import { NotesLoader } from "../components/NotesLoader";
 
 const noteMarkdown = String.raw`
 # Deep Forecasting Web App
@@ -107,6 +108,7 @@ export const Notes = () => {
 
   return (
     <PageWrapper className="space-y-10 pb-10">
+      <NotesLoader />
       <motion.section variants={itemVariants} className="rounded-[22px] border border-[var(--kaito-border)] bg-[var(--kaito-surface)] p-8 shadow-sm">
         <p className="text-xs uppercase tracking-[0.28em] text-[var(--kaito-muted)]">Readme</p>
         <h1 className="text-4xl leading-tight">DeepCast overview and setup notes.</h1>

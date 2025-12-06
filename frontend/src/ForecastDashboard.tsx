@@ -9,6 +9,7 @@ import { ConfigPanel } from "./components/ConfigPanel";
 import { FileUpload } from "./components/FileUpload";
 import { ForecastChart } from "./components/ForecastChart";
 import { ForecastDataTable } from "./components/ForecastDataTable";
+import { FlightLoader } from "./components/FlightLoader";
 import { PageWrapper, containerVariants, fluidEase, itemVariants } from "./components/PageWrapper";
 import { SampleDatasetPicker } from "./components/SampleDatasetPicker";
 import { TopKpiRow } from "./components/TopKpiRow";
@@ -752,6 +753,7 @@ export const App = () => {
 
   return (
     <div className={isDark ? "dark" : ""}>
+      <FlightLoader />
       <PageWrapper className="kaito-shell relative flex h-screen flex-col items-stretch overflow-hidden overflow-y-auto bg-[var(--kaito-bg)] text-[var(--kaito-ink)] transition-colors duration-500 dark:bg-slate-950 dark:text-slate-200 lg:flex-row lg:overflow-hidden">
         <motion.aside
           layout

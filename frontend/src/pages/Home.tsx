@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { cubicBezier, motion, useMotionValue, useScroll, useTransform } from "framer-motion";
 
 import { PageWrapper, itemVariants } from "../components/PageWrapper";
+import { HomeLoader } from "../components/HomeLoader";
 
 type WaveSpec = { stroke: string; delay: number; speed: number; offset: number; opacity: number };
 
@@ -88,6 +89,7 @@ export const Home = () => {
 
   return (
     <div ref={pageRef}>
+      <HomeLoader />
       <PageWrapper className="space-y-16 pb-10 md:space-y-20">
         <motion.section
           variants={itemVariants}
